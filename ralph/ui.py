@@ -103,9 +103,16 @@ class RalphUI:
         if cleaned:
             self.console.print(f"  {cleaned}")
 
-    def print_all_complete(self, iterations: int, total_duration: timedelta) -> None:
+    def print_all_complete(self, iterations: int, start_time) -> None:
         """Print all tasks complete message."""
         self.console.print()
+
+        # Handle both datetime and timedelta
+        if isinstance(start_time, datetime):
+            total_duration = datetime.now() - start_time
+        else:
+            total_duration = start_time
+
         panel = Panel(
             Text.assemble(
                 ("All phases completed!\n\n", "bold green"),
@@ -121,15 +128,22 @@ class RalphUI:
         )
         self.console.print(panel)
 
-    def print_max_iterations_reached(self, max_iterations: int, total_duration: timedelta) -> None:
+    def print_max_iterations_reached(self, max_iterations: int, start_time) -> None:
         """Print max iterations reached message."""
         self.console.print()
+
+        # Handle both datetime and timedelta
+        if isinstance(start_time, datetime):
+            total_duration = datetime.now() - start_time
+        else:
+            total_duration = start_time
+
         panel = Panel(
             Text.assemble(
                 (f"Reached maximum iterations ({max_iterations})\n\n", "yellow"),
                 ("Total time: ", "dim"),
                 (self._format_duration(total_duration), "cyan"),
-                ("\n\nRun again to continue from where you left off.", "dim"),
+                ("\n\nRun [cyan]ralph resume[/cyan] to continue.", "dim"),
             ),
             title="[bold yellow]⚠ Iteration Limit[/bold yellow]",
             border_style="yellow",

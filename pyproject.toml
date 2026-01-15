@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"
 authors = [
-    { name = "Nafeez Khaled", email = "nk.fssoft@gmail.com" }
+    { name = "Khaled Bin A Quadir", email = "perception30@gmail.com" }
 ]
 keywords = ["cli", "claude", "ai", "autonomous", "agent", "coding"]
 classifiers = [
