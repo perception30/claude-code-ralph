@@ -389,6 +389,6 @@ class Project:
             "completed_tasks": self.completed_tasks,
             "progress_percent": round(self.progress * 100, 1),
             "iterations_run": len(self.iterations),
-            "current_phase": self.get_current_phase().name if self.get_current_phase() else None,
-            "next_task": self.get_next_task().name if self.get_next_task() else None,
+            "current_phase": (phase.name if (phase := self.get_current_phase()) else None),
+            "next_task": (task.name if (task := self.get_next_task()) else None),
         }

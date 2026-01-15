@@ -7,7 +7,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
-import pexpect
+import pexpect  # type: ignore[import-untyped]
 
 from .prompt import PromptBuilder, ExecutionContext
 from .output import OutputParser, ParsedOutput

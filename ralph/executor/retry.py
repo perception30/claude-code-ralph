@@ -3,7 +3,7 @@
 import time
 import random
 from dataclasses import dataclass
-from typing import Callable, TypeVar, Optional, Any
+from typing import Callable, TypeVar, Optional, Any, cast
 from enum import Enum
 
 
@@ -161,7 +161,7 @@ def with_retry(
             result, value, error = strategy.execute(lambda: func(*args, **kwargs))
 
             if result == RetryResult.SUCCESS:
-                return value
+                return cast(T, value)
             else:
                 raise error or Exception("Retry exhausted with no error")
 

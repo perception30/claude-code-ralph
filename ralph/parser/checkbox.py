@@ -47,7 +47,7 @@ class CheckboxParser:
         source_file: Optional[str] = None
     ) -> list[Task]:
         """Extract tasks from checkbox content."""
-        tasks = []
+        tasks: list[Task] = []
         lines = content.split('\n')
 
         for line_num, line in enumerate(lines, 1):

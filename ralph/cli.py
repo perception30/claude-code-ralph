@@ -13,6 +13,7 @@ from .config import RalphConfig, get_project_config_path
 from .state.store import StateStore
 from .state.tracker import ProgressTracker
 from .state.models import TaskStatus
+from .input.base import InputSource
 from .input.prompt import PromptInput
 from .input.plans import PlansInput
 from .input.prd import PRDInput
@@ -156,6 +157,7 @@ def run(
     project = None
     source_files = []
 
+    input_source: InputSource
     if prompt:
         # Direct prompt
         input_source = PromptInput(prompt=prompt)
@@ -206,7 +208,8 @@ def run(
 
     elif config:
         # Config file
-        input_source = ConfigInput(config_file=config)
+        config_input = ConfigInput(config_file=config)
+        input_source = config_input
         errors = input_source.validate()
         if errors:
             for err in errors:
@@ -218,8 +221,8 @@ def run(
             project = result.project
             source_files = result.source_files
             # Override settings from config
-            if input_source.config:
-                cfg = input_source.config
+            if config_input.config:
+                cfg = config_input.config
                 max_iterations = cfg.max_iterations
                 idle_timeout = cfg.idle_timeout
                 sleep_between = cfg.sleep_between
@@ -283,6 +286,9 @@ def run(
     # Create executor
     retry_config = RetryConfig(max_attempts=retry)
 
+    # Project must be set at this point (all code paths either set it or exit)
+    assert project is not None, "No project available for execution"
+
     executor = RalphExecutor(
         project=project,
         working_dir=working_dir,
@@ -303,8 +309,9 @@ def run(
         success = executor.run()
 
         if success:
+            tracker_project = executor.tracker.project
             ui.print_all_complete(
-                executor.tracker.project.current_iteration,
+                tracker_project.current_iteration if tracker_project else 0,
                 executor.start_time
             )
         else:
@@ -505,6 +512,10 @@ def history(
         raise typer.Exit(0)
 
     project = store.load()
+    if not project:
+        ui.console.print("[yellow]Could not load project history[/yellow]")
+        raise typer.Exit(0)
+
     tracker = ProgressTracker(store)
 
     ui.console.print(f"\n[bold]Iteration History[/bold] ({len(project.iterations)} total)\n")
