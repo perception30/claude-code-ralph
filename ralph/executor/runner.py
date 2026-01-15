@@ -61,10 +61,8 @@ class ClaudeRunner:
                     self._stop_interaction = True
                     if self.process and self.process.isalive():
                         try:
-                            # Send Escape to dismiss any autocomplete, then /exit with newline
-                            self.process.send("\x1b")  # Escape key
-                            time.sleep(0.1)
-                            self.process.sendline("/exit")
+                            # Send Ctrl+D (EOF) to exit Claude CLI
+                            self.process.sendcontrol('d')
                         except OSError:
                             pass
                     break
@@ -165,10 +163,8 @@ class ClaudeRunner:
 
             # Clean up process
             if self.process and self.process.isalive():
-                # Send Escape to dismiss any autocomplete, then /exit with newline
-                self.process.send("\x1b")  # Escape key
-                time.sleep(0.1)
-                self.process.sendline("/exit")
+                # Send Ctrl+D (EOF) to exit Claude CLI
+                self.process.sendcontrol('d')
                 try:
                     self.process.expect(pexpect.EOF, timeout=10)
                 except (pexpect.TIMEOUT, pexpect.EOF):
