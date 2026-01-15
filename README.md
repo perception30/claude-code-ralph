@@ -2,7 +2,7 @@
 
 **Run Claude as an autonomous coding agent.** Give it a task, and watch it work through your entire codebase.
 
-[![PyPI version](https://badge.fury.io/py/ralph-agent.svg)](https://badge.fury.io/py/ralph-agent)
+[![PyPI version](https://img.shields.io/pypi/v/ralph-agent.svg)](https://pypi.org/project/ralph-agent/)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
