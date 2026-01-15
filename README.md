@@ -9,6 +9,7 @@
 ## Features
 
 - **Flexible Input** - Run from prompts, PRD files, plan directories, or JSON configs
+- **PRD & Plans Generation** - Generate PRDs and phased plans from natural language prompts
 - **Persistent State** - Track progress across sessions in `.ralph/state.json`
 - **Smart Parsing** - Parse markdown plans and PRDs to extract phases and tasks
 - **Completion Detection** - Structured output markers for reliable task tracking
@@ -136,6 +137,8 @@ ralph run --plans ./phases/ --dry-run
 | Command | Description |
 |---------|-------------|
 | `ralph run` | Run autonomous agent with various input sources |
+| `ralph generate prd` | Generate a PRD from a natural language prompt |
+| `ralph generate plans` | Generate phased implementation plans |
 | `ralph init` | Initialize Ralph in a project |
 | `ralph status` | Show current progress and phase status |
 | `ralph resume` | Continue an interrupted session |
@@ -203,6 +206,82 @@ ralph history -n 20
 
 # List pending tasks only
 ralph tasks --status pending
+```
+
+### `ralph generate` - Generate PRDs and Plans
+
+Generate PRDs and phased implementation plans from natural language prompts. Claude runs interactively to create structured documents.
+
+#### Generate PRD
+
+```bash
+ralph generate prd [OPTIONS]
+
+Options:
+  --prompt, -p TEXT      Prompt describing the feature/project
+  --from-file, -f TEXT   Path to prompt file (.txt, .md)
+  --output, -o TEXT      Output file path [default: ./PRD.md]
+  --name, -n TEXT        Project name
+  --model TEXT           Claude model to use
+  --timeout, -t INT      Seconds to wait for Claude [default: 60]
+  --dry-run              Show prompt without generating
+  --dir, -d TEXT         Working directory [default: .]
+```
+
+#### Generate Plans
+
+```bash
+ralph generate plans [OPTIONS]
+
+Options:
+  --prompt, -p TEXT      Prompt describing the feature/project
+  --from-file, -f TEXT   Path to prompt file (.txt, .md)
+  --from-prd TEXT        Convert PRD file to plans
+  --output, -o TEXT      Output directory path [default: ./plans]
+  --name, -n TEXT        Project name
+  --phases INT           Number of phases to generate (default: auto)
+  --max-tasks INT        Maximum tasks per phase [default: 10]
+  --model TEXT           Claude model to use
+  --timeout, -t INT      Seconds to wait for Claude [default: 60]
+  --dry-run              Show prompt without generating
+  --dir, -d TEXT         Working directory [default: .]
+```
+
+#### Generation Examples
+
+```bash
+# Generate PRD from a prompt
+ralph generate prd --prompt "User authentication system with OAuth support"
+
+# Generate PRD from a requirements file
+ralph generate prd --from-file ./requirements.txt --output ./docs/PRD.md
+
+# Generate phased plans from a prompt
+ralph generate plans --prompt "Refactor the authentication system"
+
+# Convert existing PRD to phased plans
+ralph generate plans --from-prd ./docs/PRD.md --output ./plans/
+
+# Generate plans with specific number of phases
+ralph generate plans --prompt "Build a REST API" --phases 4
+
+# Preview the prompt without generating (dry run)
+ralph generate prd --prompt "New feature" --dry-run
+```
+
+#### Typical Workflow
+
+```bash
+# Step 1: Generate PRD from your idea
+ralph generate prd --prompt "Build a task management system with teams"
+
+# Step 2: Review and edit PRD.md as needed
+
+# Step 3: Generate phased plans from PRD
+ralph generate plans --from-prd ./PRD.md --output ./.ide/tasks/plans/
+
+# Step 4: Run Ralph to execute the plans
+ralph run --plans ./.ide/tasks/plans/
 ```
 
 ## How It Works
@@ -334,11 +413,12 @@ Ralph persists state in `.ralph/state.json`:
 
 ```
 ralph/
-├── cli.py           # CLI commands (run, status, resume, etc.)
+├── cli.py           # CLI commands (run, status, resume, generate, etc.)
 ├── input/           # Input handlers (prompt, prd, plans, config)
 ├── parser/          # Markdown & checkbox parsing
 ├── state/           # State management (models, store, tracker)
 ├── executor/        # Claude execution (prompt, output, retry)
+├── generator/       # PRD & plans generation (prd, plans, templates)
 └── utils/           # File and git utilities
 ```
 
