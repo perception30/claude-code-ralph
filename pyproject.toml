@@ -48,10 +48,10 @@ dev = [
 ralph = "ralph.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/ralph-agent"
-Documentation = "https://github.com/yourusername/ralph-agent#readme"
-Repository = "https://github.com/yourusername/ralph-agent"
-Issues = "https://github.com/yourusername/ralph-agent/issues"
+Homepage = "https://github.com/perception30/claude-code-ralph"
+Documentation = "https://github.com/perception30/claude-code-ralph#readme"
+Repository = "https://github.com/perception30/claude-code-ralph"
+Issues = "https://github.com/perception30/claude-code-ralph/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["ralph"]
