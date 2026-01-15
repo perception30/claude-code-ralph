@@ -36,9 +36,9 @@ class PromptBuilder:
 {source_files}
 
 ## INSTRUCTIONS
-1. **Analyze** - Read relevant code to understand context before making changes
-2. **Implement** - Complete the current task fully, following existing patterns
-3. **Verify** - Run quality checks (test, lint, typecheck) appropriate for the project
+1. **Analyze** - Read relevant code paths/modules, deep analyse to understand context before making any changes
+2. **Implement** - Complete the current task fully, following existing patterns and best practices step by step
+3. **Verify** - Run quality/static checks (test, lint, typecheck) appropriate for the project
 4. **Document** - Update source file checkbox: `- [x]` when task is done
 5. **Commit** - If checks pass: `git commit -m "{commit_prefix} {task_id} - {task_name}"`
 
@@ -58,7 +58,7 @@ If ALL project tasks are done:
 {{"status": "PROJECT_COMPLETE"}}
 ```
 {custom_section}
-Now implement the task. Be thorough but efficient.'''
+Now implement the task carefully. Be thorough but efficient.'''
     )
 
     def __init__(self, context: Optional[ExecutionContext] = None):
@@ -111,15 +111,22 @@ Now implement the task. Be thorough but efficient.'''
             "Phases:",
         ]
 
+        current_found = False
         for phase in project.phases:
             status_icon = self._get_status_icon(phase.status)
-            is_current = (
-                phase.status in (TaskStatus.PENDING, TaskStatus.IN_PROGRESS)
-                and not phase.is_complete
-            )
-            current = " ← current" if is_current else ""
             task_count = f"{phase.completed_count}/{len(phase.tasks)}"
-            lines.append(f"  {status_icon} {phase.name}: {task_count} tasks{current}")
+
+            # Only mark the FIRST incomplete phase as current
+            is_current = (
+                not current_found
+                and not phase.is_complete
+                and phase.status in (TaskStatus.PENDING, TaskStatus.IN_PROGRESS)
+            )
+            if is_current:
+                current_found = True
+                lines.append(f"  {status_icon} {phase.name}: {task_count} ← current")
+            else:
+                lines.append(f"  {status_icon} {phase.name}: {task_count}")
 
         return "\n".join(lines)
 

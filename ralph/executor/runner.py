@@ -11,6 +11,7 @@ from typing import Callable, Optional
 import pexpect  # type: ignore[import-untyped]
 
 from ..parser.checkbox import CheckboxUpdater
+from ..state.identity import ProjectIdentity
 from ..state.models import Project
 from ..state.store import StateStore
 from ..state.tracker import ProgressTracker
@@ -68,18 +69,32 @@ class ClaudeRunner:
             # Let it output directly to stdout
             self.process.logfile_read = sys.stdout.buffer
 
-            # Keep waiting while there's output (like expect's exp_continue)
-            # Check status file after each chunk - exit immediately when written
+            # Keep waiting while there's output
+            # After status file detected, use shorter timeout and max wait
+            import time
+            status_detected = False
+            post_status_start = None
+            post_status_idle_timeout = 3  # Short idle timeout after status
+            max_post_status_wait = 10  # Max total wait after status (fallback)
+
             while True:
                 try:
-                    self.process.expect(r'.+', timeout=self.idle_timeout)
+                    # Use shorter timeout after status is detected
+                    timeout = post_status_idle_timeout if status_detected else self.idle_timeout
+                    self.process.expect(r'.+', timeout=timeout)
 
                     # Check if Claude wrote the status file
-                    if status_file.exists():
-                        break
+                    if status_file.exists() and not status_detected:
+                        status_detected = True
+                        post_status_start = time.time()
+
+                    # Check max wait after status (fallback)
+                    if status_detected and post_status_start:
+                        if time.time() - post_status_start > max_post_status_wait:
+                            break
 
                 except pexpect.TIMEOUT:
-                    # No output for idle_timeout - Claude is idle
+                    # No output for timeout period - Claude is idle/done
                     break
                 except pexpect.EOF:
                     # Process ended
@@ -187,6 +202,7 @@ class RalphExecutor:
         on_output: Optional[Callable[[str], None]] = None,
         on_progress: Optional[Callable[[dict], None]] = None,
         retry_config: Optional[RetryConfig] = None,
+        project_identity: Optional[ProjectIdentity] = None,
     ):
         self.project = project
         self.working_dir = os.path.abspath(working_dir)
@@ -201,9 +217,10 @@ class RalphExecutor:
         self.on_output = on_output
         self.on_progress = on_progress
         self.retry_config = retry_config or RetryConfig()
+        self.project_identity = project_identity
 
-        # State management
-        self.store = StateStore(working_dir)
+        # State management - use project-specific directory if identity provided
+        self.store = StateStore(working_dir, project_identity=project_identity)
         self.tracker = ProgressTracker(self.store, on_progress)
         self.prompt_builder = PromptBuilder()
 
@@ -213,7 +230,13 @@ class RalphExecutor:
         self.start_time: Optional[datetime] = None
 
     def setup(self) -> None:
-        """Initialize state for execution."""
+        """Initialize state for execution.
+
+        Merges the provided project with any existing state to preserve
+        task completion status from previous runs.
+        """
+        # Merge with existing state to preserve progress
+        self.project = self.store.merge_with_existing(self.project)
         self.store._project = self.project
         self.store.save()
 
@@ -223,7 +246,11 @@ class RalphExecutor:
         self.setup()
         self.start_time = datetime.now()
 
-        for iteration in range(1, self.max_iterations + 1):
+        # Continue from last iteration + 1
+        start_iteration = self.project.current_iteration + 1
+        end_iteration = start_iteration + self.max_iterations
+
+        for iteration in range(start_iteration, end_iteration):
             if self._interrupted:
                 break
 
@@ -253,7 +280,7 @@ class RalphExecutor:
 
             # Run Claude
             print(f"\n{'='*60}")
-            print(f"  Iteration {iteration} of {self.max_iterations}")
+            print(f"  Iteration {iteration} (max additional: {self.max_iterations})")
             print(f"{'='*60}\n")
 
             self._current_runner = ClaudeRunner(

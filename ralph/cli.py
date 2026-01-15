@@ -23,6 +23,7 @@ from .input.plans import PlansInput
 from .input.prd import PRDInput
 from .input.prompt import PromptInput
 from .parser.markdown import MarkdownParser
+from .state.identity import ProjectIdentifier, ProjectIdentity
 from .state.models import TaskStatus
 from .state.store import StateStore
 from .state.tracker import ProgressTracker
@@ -158,9 +159,10 @@ def run(
     if not quiet:
         ui.print_banner()
 
-    # Determine input source and parse
+    # Determine input source, parse, and create project identity
     project = None
     source_files = []
+    project_identity: Optional[ProjectIdentity] = None
 
     input_source: InputSource
     if prompt:
@@ -170,6 +172,7 @@ def run(
         if result.is_valid:
             project = result.project
             source_files = result.source_files
+            project_identity = ProjectIdentifier.from_prompt(prompt)
         else:
             for err in result.errors:
                 ui.print_error(err)
@@ -188,6 +191,7 @@ def run(
         if result.is_valid:
             project = result.project
             source_files = result.source_files
+            project_identity = ProjectIdentifier.from_prd_file(prd, working_dir)
         else:
             for err in result.errors:
                 ui.print_error(err)
@@ -206,6 +210,7 @@ def run(
         if result.is_valid:
             project = result.project
             source_files = result.source_files
+            project_identity = ProjectIdentifier.from_plans_dir(plans, working_dir)
         else:
             for err in result.errors:
                 ui.print_error(err)
@@ -225,6 +230,7 @@ def run(
         if result.is_valid:
             project = result.project
             source_files = result.source_files
+            project_identity = ProjectIdentifier.from_config_file(config, working_dir)
             # Override settings from config
             if config_input.config:
                 cfg = config_input.config
@@ -247,6 +253,9 @@ def run(
             if result.is_valid:
                 project = result.project
                 source_files = result.source_files
+                project_identity = ProjectIdentifier.from_plans_dir(
+                    str(default_plans), working_dir
+                )
             else:
                 ui.print_error("No input source specified and no default plans found")
                 ui.console.print("\nUsage:")
@@ -296,6 +305,10 @@ def run(
     # Project must be set at this point (all code paths either set it or exit)
     assert project is not None, "No project available for execution"
 
+    # Show project identity info
+    if not quiet and project_identity:
+        ui.console.print(f"[dim]Project ID: {project_identity.project_id[:8]}...[/dim]")
+
     executor = RalphExecutor(
         project=project,
         working_dir=working_dir,
@@ -308,6 +321,7 @@ def run(
         update_source=not no_state,
         on_output=lambda line: ui.print_claude_line(line) if not quiet else None,
         retry_config=retry_config,
+        project_identity=project_identity,
     )
 
     # Run execution
@@ -666,6 +680,60 @@ def reset(
 
     store.reset()
     ui.console.print("[green]State reset![/green]")
+
+
+@app.command()
+def projects(
+    working_dir: str = typer.Option(
+        ".", "--dir", "-d",
+        help="Working directory",
+    ),
+) -> None:
+    """List all Ralph projects with their status."""
+    working_dir = os.path.abspath(working_dir)
+    projects_list = StateStore.list_projects(working_dir)
+
+    if not projects_list:
+        ui.console.print("[yellow]No projects found[/yellow]")
+        ui.console.print("\nRun [cyan]ralph run --plans ./your-plans/[/cyan] to start a project")
+        raise typer.Exit(0)
+
+    ui.console.print(f"\n[bold]Ralph Projects[/bold] ({len(projects_list)} total)\n")
+
+    table = Table()
+    table.add_column("ID", style="cyan")
+    table.add_column("Name")
+    table.add_column("Status")
+    table.add_column("Progress")
+    table.add_column("Source")
+
+    for proj in projects_list:
+        status = proj["status"]
+        if status == "completed":
+            status_style = "green"
+        elif status == "in_progress":
+            status_style = "yellow"
+        else:
+            status_style = "dim"
+
+        completed = proj["completed_tasks"]
+        total = proj["total_tasks"]
+        pct = f"{completed}/{total}" if total > 0 else "-"
+
+        # Show first source file (shortened)
+        source = proj["source_files"][0] if proj["source_files"] else "-"
+        if len(source) > 30:
+            source = "..." + source[-27:]
+
+        table.add_row(
+            proj["project_id"][:8] + "...",
+            proj["name"][:25],
+            f"[{status_style}]{status}[/{status_style}]",
+            pct,
+            source,
+        )
+
+    ui.console.print(table)
 
 
 # Generate command group

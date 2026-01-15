@@ -10,13 +10,15 @@
 
 - **Flexible Input** - Run from prompts, PRD files, plan directories, or JSON configs
 - **PRD & Plans Generation** - Generate PRDs and phased plans from natural language prompts
-- **Persistent State** - Track progress across sessions in `.ralph/state.json`
+- **Multi-Project Support** - Work on multiple projects simultaneously without interference
+- **Persistent State** - Track progress across sessions with automatic resume
 - **Smart Parsing** - Parse markdown plans and PRDs to extract phases and tasks
+- **Globally Unique Task IDs** - Reliable task tracking across all phases and files
 - **Completion Detection** - Structured output markers for reliable task tracking
 - **Auto Checkboxes** - Automatically update `[ ]` to `[x]` in source files
 - **Retry Logic** - Exponential backoff with configurable retry attempts
 - **Rich Terminal UI** - Beautiful progress bars, status panels, and task tables
-- **Resume Capability** - Continue interrupted sessions from where you left off
+- **Resume Capability** - Continue interrupted sessions from exactly where you left off
 
 ## Installation
 
@@ -118,7 +120,25 @@ ralph run --config ./ralph.json
 
 ### Resuming Work
 
-If interrupted (Ctrl+C or timeout), resume anytime:
+If interrupted (Ctrl+C or timeout), simply re-run the same command:
+
+```bash
+# Original run
+ralph run --plans ./my-feature/
+
+# ... interrupted ...
+
+# Resume - just run the same command again
+ralph run --plans ./my-feature/
+```
+
+Ralph automatically:
+1. Recognizes this is the same project (by input source)
+2. Loads existing state from `.ralph/projects/<id>/`
+3. Continues from the last incomplete task
+4. Preserves iteration history
+
+You can also use the legacy resume command:
 
 ```bash
 ralph resume
@@ -141,6 +161,7 @@ ralph run --plans ./phases/ --dry-run
 | `ralph generate plans` | Generate phased implementation plans |
 | `ralph init` | Initialize Ralph in a project |
 | `ralph status` | Show current progress and phase status |
+| `ralph projects` | List all projects and their progress |
 | `ralph resume` | Continue an interrupted session |
 | `ralph history` | Show iteration history |
 | `ralph tasks` | List all tasks with their status |
@@ -195,8 +216,11 @@ ralph run --plans ./.ide/tasks/plans/ --verbose
 # Dry run to preview tasks
 ralph run --plans ./phases/ --dry-run
 
-# Resume after interruption
-ralph resume
+# Resume after interruption (re-run same command)
+ralph run --plans ./my-feature/
+
+# List all projects
+ralph projects
 
 # Check detailed progress
 ralph status --detailed
@@ -324,20 +348,30 @@ Ralph parses markdown files with this structure:
 ## Phase 1: Setup
 Status: IN_PROGRESS
 
-- [x] US-001: Initialize project structure
-  - Priority: 1
+- [x] TASK-101: Initialize project structure
+  - Priority: High
   - Description: Set up Next.js with TypeScript
 
-- [ ] US-002: Configure database
-  - Priority: 1
-  - Dependencies: US-001
+- [ ] TASK-102: Configure database
+  - Priority: High
+  - Dependencies: TASK-101
 
 ## Phase 2: Implementation
 
-- [ ] US-003: Create user model
-  - Priority: 2
-  - Dependencies: US-002
+- [ ] TASK-201: Create user model
+  - Priority: Medium
+  - Dependencies: TASK-102
 ```
+
+### Task ID Convention
+
+**IMPORTANT:** Task IDs must be globally unique across all files:
+
+- Phase 1: `TASK-101`, `TASK-102`, `TASK-103`, etc.
+- Phase 2: `TASK-201`, `TASK-202`, `TASK-203`, etc.
+- Phase 3: `TASK-301`, `TASK-302`, `TASK-303`, etc.
+
+If task IDs are omitted, Ralph auto-generates unique IDs, but explicit IDs are recommended for clarity and reliable dependency tracking.
 
 ## PRD Format Support
 
@@ -395,7 +429,55 @@ Implement secure user authentication.
 
 ## State Management
 
-Ralph persists state in `.ralph/state.json`:
+### Multi-Project Isolation
+
+Ralph supports multiple concurrent projects without interference. Each input source gets its own isolated state directory:
+
+```
+.ralph/
+└── projects/
+    ├── a92f5b03.../       # Project from ./plans/feature-a/
+    │   ├── state.json
+    │   └── status.json
+    ├── 7c8d9e01.../       # Project from ./plans/feature-b/
+    │   ├── state.json
+    │   └── status.json
+    └── 37ae55ff.../       # Project from --prompt "Fix bug"
+        ├── state.json
+        └── status.json
+```
+
+### Project Identity
+
+Projects are identified by their input source:
+
+| Input Type | Identity Based On | Same Input = Same Project? |
+|------------|-------------------|---------------------------|
+| `--plans ./dir/` | Directory path | ✓ Yes |
+| `--prd ./file.md` | File path | ✓ Yes |
+| `--prompt "text"` | Prompt text hash | ✓ Yes |
+| `--config ./file.json` | Config file path | ✓ Yes |
+
+This means:
+- Running `ralph run --plans ./my-feature/` twice **continues** from where you left off
+- Running `ralph run --plans ./different-feature/` is a **separate project**
+- Both can run without interfering with each other
+
+### List All Projects
+
+```bash
+$ ralph projects
+
+Ralph Projects (2 total)
+
+ID         Name              Status       Progress    Source
+a92f5b03   feature-a         in_progress  5/12        ...plans/feature-a
+7c8d9e01   feature-b         pending      0/8         ...plans/feature-b
+```
+
+### State File Structure
+
+Each project's `state.json`:
 
 ```json
 {
@@ -413,10 +495,14 @@ Ralph persists state in `.ralph/state.json`:
 
 ```
 ralph/
-├── cli.py           # CLI commands (run, status, resume, generate, etc.)
+├── cli.py           # CLI commands (run, status, resume, projects, generate)
 ├── input/           # Input handlers (prompt, prd, plans, config)
 ├── parser/          # Markdown & checkbox parsing
-├── state/           # State management (models, store, tracker)
+├── state/           # State management
+│   ├── models.py    # Data models (Project, Phase, Task)
+│   ├── store.py     # Persistent storage with multi-project support
+│   ├── tracker.py   # Progress tracking
+│   └── identity.py  # Project identity generation
 ├── executor/        # Claude execution (prompt, output, retry)
 ├── generator/       # PRD & plans generation (prd, plans, templates)
 └── utils/           # File and git utilities

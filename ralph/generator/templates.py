@@ -1,27 +1,49 @@
 """AI prompt templates for PRD and plans generation."""
 
 # PRD Generation Template - Claude writes directly to file
+# Uses plan-style format for consistency and direct executability
 PRD_GENERATION_TEMPLATE = '''You are a technical product manager creating a PRD.
 
 ## USER REQUEST
 {user_prompt}
 
-## OUTPUT PATH
-Write the PRD to: {output_path}
+## OUTPUT DIRECTORY
+Write plan files to: {output_path}
 
 ## INSTRUCTIONS
-1. Create a PRD document following standard format with:
-   - Overview section
-   - User Stories (US-001, US-002, etc.) with acceptance criteria
-   - Each user story should have **Status:** Pending, **Priority:** High/Medium/Low
-   - Use - [ ] checkboxes for acceptance criteria
+Create a PRD using the phased plan format for direct executability:
 
-2. Write the PRD file directly to the output path specified above
+1. Create a directory structure with:
+   - 00-overview.md - Project overview with phase summary table
+   - 01-phase-name.md, 02-phase-name.md, etc. - Individual phase files
 
-3. When done, write status to `.ralph/status.json`:
+2. The 00-overview.md should include:
+   - # Project title
+   - ## Overview (project description, goals, scope)
+   - ## User Stories (brief user story context for each phase)
+   - ## Phase Summary (table with phase names and status)
+
+3. Each phase file (01-xxx.md, 02-xxx.md) should have:
+   - ## Objective (what this phase achieves)
+   - ## User Story Context (the user story this phase addresses)
+   - ## Tasks with checkboxes:
+     - [ ] TASK-N01: Description
+       - Priority: High/Medium/Low
+       - Dependencies: none or TASK-XXX
+       - Description: Detailed implementation notes
+   - ## Verification (how to verify phase completion)
+
+4. CRITICAL - Task IDs must be GLOBALLY UNIQUE across all files:
+   - Phase 1: TASK-101, TASK-102, TASK-103, etc.
+   - Phase 2: TASK-201, TASK-202, TASK-203, etc.
+   - Phase 3: TASK-301, TASK-302, TASK-303, etc.
+
+5. Write all files directly to the output directory
+
+6. When done, write status to `.ralph/status.json`:
    {{"status": "COMPLETED", "task_id": "generate-prd"}}
 
-Now create the PRD file.
+Now create the PRD files.
 '''
 
 # Plans Generation Template - Claude writes files directly
@@ -44,7 +66,11 @@ Write plan files to: {output_path}
    - Task metadata: Priority, Dependencies, Description
    - ## Verification section
 
-3. Task IDs: TASK-101, TASK-102 for phase 1; TASK-201, TASK-202 for phase 2, etc.
+3. CRITICAL - Task IDs must be GLOBALLY UNIQUE across all files:
+   - Phase 1: TASK-101, TASK-102, TASK-103, etc.
+   - Phase 2: TASK-201, TASK-202, TASK-203, etc.
+   - Phase 3: TASK-301, TASK-302, TASK-303, etc.
+   - Never reuse task IDs across different phases or files
 
 4. Write all files directly to the output directory
 
@@ -55,7 +81,8 @@ Now create the plan files.
 '''
 
 # PRD to Plans Conversion Template
-PRD_TO_PLANS_TEMPLATE = '''You are a technical architect converting a PRD to plans.
+# Used when PRD exists in legacy format or needs restructuring
+PRD_TO_PLANS_TEMPLATE = '''You are a technical architect refining a PRD into execution-ready plans.
 
 ## INPUT PRD
 {prd_content}
@@ -64,14 +91,39 @@ PRD_TO_PLANS_TEMPLATE = '''You are a technical architect converting a PRD to pla
 Write plan files to: {output_path}
 
 ## INSTRUCTIONS
-1. Convert user stories to implementation tasks
-2. Group related tasks into phases
-3. Create plan files:
-   - 00-overview.md
-   - 01-phase-name.md, 02-phase-name.md, etc.
+Analyze the PRD and create/refine phased execution plans:
 
-4. When done, write status to `.ralph/status.json`:
+1. If PRD already uses phased format, refine and enhance:
+   - Ensure task granularity is appropriate (1-4 hours each)
+   - Add missing dependencies between tasks
+   - Ensure verification steps are concrete and testable
+
+2. If PRD uses legacy user-story format, convert to phased plans:
+   - Group user stories into logical implementation phases
+   - Break down acceptance criteria into discrete tasks
+   - Add technical implementation details
+
+3. Create/update plan files:
+   - 00-overview.md - Master overview with phase table
+   - 01-phase-name.md, 02-phase-name.md, etc. - Phase files
+
+4. Each phase file must have:
+   - ## Objective
+   - ## Tasks with checkboxes:
+     - [ ] TASK-N01: Description
+       - Priority: High/Medium/Low
+       - Dependencies: none or TASK-XXX
+       - Description: Implementation details
+   - ## Verification
+
+5. CRITICAL - Task IDs must be GLOBALLY UNIQUE across all files:
+   - Phase 1: TASK-101, TASK-102, TASK-103, etc.
+   - Phase 2: TASK-201, TASK-202, TASK-203, etc.
+   - Phase 3: TASK-301, TASK-302, TASK-303, etc.
+   - Never reuse task IDs across different phases or files
+
+6. When done, write status to `.ralph/status.json`:
    {{"status": "COMPLETED", "task_id": "generate-plans"}}
 
-Now convert the PRD to plan files.
+Now create the plan files.
 '''

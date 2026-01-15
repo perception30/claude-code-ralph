@@ -5,19 +5,59 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from .identity import ProjectIdentity
 from .models import Iteration, Phase, Project, Task, TaskStatus
 
 
 class StateStore:
-    """Manages persistent state storage for Ralph projects."""
+    """Manages persistent state storage for Ralph projects.
+
+    Supports project-specific directories to allow multiple concurrent
+    projects without state interference.
+
+    Directory structure:
+        .ralph/
+            projects/
+                <project-id>/
+                    state.json
+                    status.json
+                    logs/
+    """
 
     DEFAULT_STATE_DIR = ".ralph"
+    PROJECTS_SUBDIR = "projects"
     DEFAULT_STATE_FILE = "state.json"
+    STATUS_FILE = "status.json"
 
-    def __init__(self, working_dir: str = "."):
+    def __init__(
+        self,
+        working_dir: str = ".",
+        project_identity: Optional[ProjectIdentity] = None
+    ):
+        """Initialize state store.
+
+        Args:
+            working_dir: Working directory for the project
+            project_identity: Optional project identity for isolation.
+                If provided, state is stored in a project-specific directory.
+                If not provided, uses legacy single-project mode for backwards
+                compatibility.
+        """
         self.working_dir = Path(working_dir).resolve()
-        self.state_dir = self.working_dir / self.DEFAULT_STATE_DIR
+        self.project_identity = project_identity
+
+        # Determine state directory based on project identity
+        base_state_dir = self.working_dir / self.DEFAULT_STATE_DIR
+        if project_identity:
+            self.state_dir = (
+                base_state_dir / self.PROJECTS_SUBDIR / project_identity.state_dir_name
+            )
+        else:
+            # Legacy mode - single state directory
+            self.state_dir = base_state_dir
+
         self.state_file = self.state_dir / self.DEFAULT_STATE_FILE
+        self.status_file = self.state_dir / self.STATUS_FILE
         self._project: Optional[Project] = None
 
     @property
@@ -217,6 +257,105 @@ class StateStore:
                 "progress_percent": 0,
             }
         return self._project.get_summary()
+
+    def merge_with_existing(self, new_project: Project) -> Project:
+        """Merge a newly parsed project with existing state.
+
+        Preserves task completion status, iteration history, and other
+        runtime state from the existing project while adopting any new
+        tasks or phases from the fresh parse.
+
+        Note: When using project_identity, projects are already matched
+        by their unique ID, so we always merge. In legacy mode (no identity),
+        we check source files for backwards compatibility.
+
+        Args:
+            new_project: Freshly parsed project from plan files
+
+        Returns:
+            Merged project with preserved state
+        """
+        existing = self.load()
+        if not existing:
+            return new_project
+
+        # In legacy mode (no project identity), check source files match
+        if not self.project_identity:
+            if set(existing.source_files) != set(new_project.source_files):
+                # Different project in legacy mode, use new one
+                return new_project
+
+        # Build a map of existing task states by ID
+        existing_task_states: dict[str, dict] = {}
+        for phase in existing.phases:
+            for task in phase.tasks:
+                existing_task_states[task.id] = {
+                    'status': task.status,
+                    'completed_at': task.completed_at,
+                    'started_at': task.started_at,
+                    'iteration': task.iteration,
+                    'attempts': task.attempts,
+                    'error': task.error,
+                }
+
+        # Apply existing states to new project
+        for phase in new_project.phases:
+            for task in phase.tasks:
+                if task.id in existing_task_states:
+                    state = existing_task_states[task.id]
+                    task.status = state['status']
+                    task.completed_at = state['completed_at']
+                    task.started_at = state['started_at']
+                    task.iteration = state['iteration']
+                    task.attempts = state['attempts']
+                    task.error = state['error']
+
+        # Preserve iteration history
+        new_project.iterations = existing.iterations
+        new_project.created_at = existing.created_at
+
+        # Update project status based on merged task states
+        new_project.update_status()
+
+        return new_project
+
+    @classmethod
+    def list_projects(cls, working_dir: str = ".") -> list[dict]:
+        """List all projects with saved state.
+
+        Returns:
+            List of dicts with project info (id, name, progress, etc.)
+        """
+        base_dir = Path(working_dir).resolve() / cls.DEFAULT_STATE_DIR / cls.PROJECTS_SUBDIR
+        projects: list[dict] = []
+
+        if not base_dir.exists():
+            return projects
+
+        for project_dir in base_dir.iterdir():
+            if not project_dir.is_dir():
+                continue
+
+            state_file = project_dir / cls.DEFAULT_STATE_FILE
+            if not state_file.exists():
+                continue
+
+            try:
+                with open(state_file) as f:
+                    data = json.load(f)
+                projects.append({
+                    'project_id': project_dir.name,
+                    'name': data.get('name', 'Unknown'),
+                    'status': data.get('status', 'unknown'),
+                    'total_tasks': data.get('total_tasks', 0),
+                    'completed_tasks': data.get('completed_tasks', 0),
+                    'source_files': data.get('source_files', []),
+                    'updated_at': data.get('updated_at'),
+                })
+            except (json.JSONDecodeError, OSError):
+                continue
+
+        return projects
 
     def backup(self, suffix: str = "") -> Path:
         """Create a backup of the current state."""
