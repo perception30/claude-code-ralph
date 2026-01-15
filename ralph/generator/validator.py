@@ -38,10 +38,6 @@ class GeneratorValidator:
         r'^\*\*Priority:\*\*\s*(High|Medium|Low|\d+)',
         re.MULTILINE | re.IGNORECASE
     )
-    PRD_DEPENDENCIES_PATTERN = re.compile(
-        r'^\*\*Dependenc(?:y|ies):\*\*\s*(.+?)$',
-        re.MULTILINE | re.IGNORECASE
-    )
     CHECKBOX_PATTERN = re.compile(
         r'^-\s+\[([ xX])\]\s+.+$',
         re.MULTILINE
@@ -283,39 +279,3 @@ class GeneratorValidator:
             errors.append(f"Parser failed: {e}")
 
         return errors
-
-    def check_parseability(self, content: str) -> bool:
-        """
-        Quick check if content parses correctly.
-
-        Args:
-            content: Markdown content to check
-
-        Returns:
-            True if content parses without errors
-        """
-        try:
-            project = self.parser.parse_content(content)
-            return bool(project.total_tasks > 0)
-        except Exception:
-            return False
-
-    def validate_task_id_uniqueness(self, task_ids: list[str]) -> list[str]:
-        """
-        Validate all task IDs are unique.
-
-        Args:
-            task_ids: List of task IDs to check
-
-        Returns:
-            List of duplicate IDs (empty if all unique)
-        """
-        seen: set[str] = set()
-        duplicates: list[str] = []
-
-        for tid in task_ids:
-            if tid in seen:
-                duplicates.append(tid)
-            seen.add(tid)
-
-        return duplicates

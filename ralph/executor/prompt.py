@@ -61,30 +61,6 @@ If ALL project tasks are done:
 Now implement the task. Be thorough but efficient.'''
     )
 
-    # Simplified prompt for single tasks/prompts
-    SIMPLE_PROMPT_TEMPLATE = '''You are Ralph, an autonomous software engineering agent.
-
-## TASK
-{prompt}
-
-## INSTRUCTIONS
-1. Analyze the codebase to understand context
-2. Implement the requested changes completely
-3. Run appropriate quality checks
-4. Commit changes if checks pass
-
-When done, write status to `.ralph/status.json`:
-```json
-{"status": "COMPLETED"}
-```
-
-If blocked:
-```json
-{"status": "BLOCKED", "reason": "explanation"}
-```
-{custom_section}
-Now implement the task.'''
-
     def __init__(self, context: Optional[ExecutionContext] = None):
         self.context = context
 
@@ -122,17 +98,6 @@ Now implement the task.'''
             commit_prefix=ctx.commit_prefix,
             task_id=next_task.id,
             task_name=next_task.name,
-            custom_section=custom_section,
-        )
-
-    def build_simple(self, prompt: str, custom_instructions: str = "") -> str:
-        """Build a simple prompt for direct execution."""
-        custom_section = ""
-        if custom_instructions:
-            custom_section = f"\n## ADDITIONAL CONTEXT\n{custom_instructions}\n"
-
-        return self.SIMPLE_PROMPT_TEMPLATE.format(
-            prompt=prompt,
             custom_section=custom_section,
         )
 
@@ -221,10 +186,3 @@ Verify completion and report status.'''
             TaskStatus.SKIPPED: "⊖",
         }
         return icons.get(status, "?")
-
-
-# Pre-configured prompt templates for different scenarios
-PROMPT_TEMPLATES = {
-    "autonomous": PromptBuilder.AUTONOMOUS_PROMPT_TEMPLATE,
-    "simple": PromptBuilder.SIMPLE_PROMPT_TEMPLATE,
-}

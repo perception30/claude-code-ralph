@@ -4,7 +4,7 @@ import random
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional, TypeVar, cast
+from typing import Callable, Optional, TypeVar
 
 
 class RetryResult(Enum):
@@ -73,12 +73,6 @@ class RetryStrategy:
         self._attempt = 0
         self._last_error = None
 
-    def record_attempt(self, success: bool = False, error: Optional[Exception] = None) -> None:
-        """Record an attempt result."""
-        self._attempt += 1
-        if error:
-            self._last_error = error
-
     def wait(self) -> None:
         """Wait for the appropriate backoff duration."""
         if self._attempt > 0:
@@ -130,40 +124,3 @@ class RetryStrategy:
                 self.wait()
 
         return (RetryResult.EXHAUSTED, None, self._last_error)
-
-
-class RetryableError(Exception):
-    """Error that should be retried."""
-    pass
-
-
-class NonRetryableError(Exception):
-    """Error that should not be retried."""
-    pass
-
-
-def with_retry(
-    max_attempts: int = 3,
-    base_delay: float = 1.0,
-    max_delay: float = 60.0,
-) -> Callable:
-    """Decorator to add retry logic to a function."""
-
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
-        def wrapper(*args: Any, **kwargs: Any) -> T:
-            config = RetryConfig(
-                max_attempts=max_attempts,
-                base_delay=base_delay,
-                max_delay=max_delay,
-            )
-            strategy = RetryStrategy(config)
-
-            result, value, error = strategy.execute(lambda: func(*args, **kwargs))
-
-            if result == RetryResult.SUCCESS:
-                return cast(T, value)
-            else:
-                raise error or Exception("Retry exhausted with no error")
-
-        return wrapper
-    return decorator

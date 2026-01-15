@@ -1,7 +1,5 @@
 """AI prompt templates for PRD and plans generation."""
 
-from typing import Optional
-
 # PRD Generation Template - Claude writes directly to file
 PRD_GENERATION_TEMPLATE = '''You are a technical product manager creating a PRD.
 
@@ -77,35 +75,3 @@ Write plan files to: {output_path}
 
 Now convert the PRD to plan files.
 '''
-
-
-def build_tech_stack_context(tech_stack: list[str]) -> str:
-    """Build tech stack context for prompts."""
-    if not tech_stack:
-        return ""
-    return f"\n**Tech Stack:** {', '.join(tech_stack)}\n"
-
-
-def build_codebase_context(patterns: str) -> str:
-    """Build codebase patterns context for prompts."""
-    if not patterns:
-        return ""
-    return f"\n**Codebase Patterns:**\n{patterns}\n"
-
-
-def format_prompt(
-    template: str,
-    user_prompt: str,
-    additional_context: str = "",
-    num_phases: Optional[int] = None,
-    **kwargs: str,
-) -> str:
-    """Format a generation template with user input."""
-    phases_str = str(num_phases) if num_phases else "3-5"
-
-    return template.format(
-        user_prompt=user_prompt,
-        additional_context=additional_context or "None specified",
-        num_phases=phases_str,
-        **kwargs
-    )

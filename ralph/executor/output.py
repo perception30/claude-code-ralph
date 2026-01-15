@@ -64,13 +64,9 @@ class OutputParser:
         re.IGNORECASE
     )
 
-    # Alternative completion patterns (fallback)
+    # Alternative completion pattern (fallback)
     ALT_COMPLETED_PATTERN = re.compile(
         r'(?:task|phase).*(?:completed?|done|finished)',
-        re.IGNORECASE
-    )
-    ALT_BLOCKED_PATTERN = re.compile(
-        r'(?:blocked|stuck|cannot proceed|waiting for)',
         re.IGNORECASE
     )
 
@@ -138,53 +134,3 @@ class OutputParser:
                 result.errors.append(error_match.group(1).strip())
 
         return result
-
-    @classmethod
-    def extract_task_ids(cls, output: str) -> list[str]:
-        """Extract all task IDs mentioned in the output."""
-        task_ids = []
-
-        # Look for task ID patterns
-        id_patterns = [
-            re.compile(r'\b([A-Z]+-\d+)\b'),  # US-001, TASK-123
-            re.compile(r'task[-_](\d+)', re.IGNORECASE),  # task-1, task_1
-        ]
-
-        for pattern in id_patterns:
-            for match in pattern.finditer(output):
-                task_id = match.group(0)
-                if task_id not in task_ids:
-                    task_ids.append(task_id)
-
-        return task_ids
-
-    @classmethod
-    def is_completion_signal(cls, output: str) -> bool:
-        """Quick check if output contains any completion signal."""
-        return bool(
-            cls.TASK_STATUS_PATTERN.search(output) or
-            cls.PROJECT_COMPLETE_PATTERN.search(output)
-        )
-
-    @classmethod
-    def extract_checkbox_updates(cls, output: str) -> list[tuple[str, bool]]:
-        """Extract checkbox updates from output."""
-        updates = []
-
-        # Look for checkbox update patterns
-        checkbox_pattern = re.compile(
-            r'(?:mark(?:ed|ing)?|updat(?:ed|ing)?|chang(?:ed|ing)?)\s+'
-            r'(?:checkbox|task|item).*?'
-            r'\[([ xX])\].*?'
-            r'(?:to\s+)?\[([xX ])\]',
-            re.IGNORECASE
-        )
-
-        for match in checkbox_pattern.finditer(output):
-            old_status = match.group(1).lower() == 'x'
-            new_status = match.group(2).lower() == 'x'
-            if old_status != new_status:
-                # Try to extract the task name/ID from context
-                updates.append(("unknown", new_status))
-
-        return updates

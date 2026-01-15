@@ -19,14 +19,6 @@ class MarkdownParser:
         r'^(\s*)-\s+\[([ xX])\]\s+(?:([A-Z]+-\d+)[:\s]+)?(.+?)$',
         re.MULTILINE
     )
-    STATUS_PATTERN = re.compile(
-        r'^Status:\s*(PENDING|IN_PROGRESS|COMPLETED|BLOCKED|FAILED)$',
-        re.MULTILINE | re.IGNORECASE
-    )
-    PRIORITY_PATTERN = re.compile(
-        r'^Priority:\s*(\d+|high|medium|low)$',
-        re.MULTILINE | re.IGNORECASE
-    )
     DEPENDENCY_PATTERN = re.compile(
         r'^-?\s*Dependenc(?:y|ies):\s*(.+?)$',
         re.MULTILINE | re.IGNORECASE

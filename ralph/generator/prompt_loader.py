@@ -63,28 +63,6 @@ class PromptLoader:
         self._cache[cache_key] = content
         return content
 
-    def load_directory(self, dir_path: str) -> dict[str, str]:
-        """
-        Load all prompt files from a directory.
-
-        Args:
-            dir_path: Path to directory containing prompt files
-
-        Returns:
-            Dictionary mapping filename to content
-        """
-        path = Path(dir_path)
-
-        if not path.is_dir():
-            raise NotADirectoryError(f"Not a directory: {dir_path}")
-
-        prompts: dict[str, str] = {}
-        for ext in self.SUPPORTED_EXTENSIONS:
-            for file_path in path.glob(f"*{ext}"):
-                prompts[file_path.name] = self.load_file(str(file_path))
-
-        return prompts
-
     def validate(self, source: str) -> list[str]:
         """
         Validate prompt source.
@@ -127,7 +105,3 @@ class PromptLoader:
                 errors.append("Prompt cannot be empty")
 
         return errors
-
-    def clear_cache(self) -> None:
-        """Clear the prompt cache."""
-        self._cache.clear()
