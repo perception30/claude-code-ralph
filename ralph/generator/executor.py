@@ -83,8 +83,9 @@ class GeneratorExecutor:
                 # Send EOF to terminate interact() - this is the cleanest way
                 if self.process and self.process.isalive():
                     # Send /exit command to Claude
+                    # Use \r (carriage return) instead of \n - terminals expect CR to execute commands
                     try:
-                        self.process.sendline("/exit")
+                        self.process.send("/exit\r")
                     except OSError:
                         pass
                 break
@@ -179,7 +180,8 @@ class GeneratorExecutor:
 
             # Clean up process
             if self.process and self.process.isalive():
-                self.process.sendline("/exit")
+                # Use \r (carriage return) instead of \n - terminals expect CR to execute commands
+                self.process.send("/exit\r")
                 try:
                     self.process.expect(pexpect.EOF, timeout=10)
                 except (pexpect.TIMEOUT, pexpect.EOF):
