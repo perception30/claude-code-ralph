@@ -1,10 +1,9 @@
 """Document parsers for Ralph CLI."""
 
+from .checkbox import CheckboxUpdater
 from .markdown import MarkdownParser
-from .checkbox import CheckboxParser, CheckboxUpdater
 
 __all__ = [
-    "MarkdownParser",
-    "CheckboxParser",
     "CheckboxUpdater",
+    "MarkdownParser",
 ]
