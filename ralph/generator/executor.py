@@ -82,9 +82,11 @@ class GeneratorExecutor:
                 self._stop_interaction = True
                 # Send EOF to terminate interact() - this is the cleanest way
                 if self.process and self.process.isalive():
-                    # Send Ctrl+D (EOF) to exit Claude CLI
+                    # Send /exit then Enter twice (first confirms autocomplete, second executes)
                     try:
-                        self.process.sendcontrol('d')
+                        self.process.sendline("/exit")
+                        time.sleep(0.1)
+                        self.process.sendline("")  # Extra Enter to execute
                     except OSError:
                         pass
                 break
@@ -179,8 +181,10 @@ class GeneratorExecutor:
 
             # Clean up process
             if self.process and self.process.isalive():
-                # Send Ctrl+D (EOF) to exit Claude CLI
-                self.process.sendcontrol('d')
+                # Send /exit then Enter twice (first confirms autocomplete, second executes)
+                self.process.sendline("/exit")
+                time.sleep(0.1)
+                self.process.sendline("")  # Extra Enter to execute
                 try:
                     self.process.expect(pexpect.EOF, timeout=10)
                 except (pexpect.TIMEOUT, pexpect.EOF):
