@@ -1,28 +1,44 @@
 # Ralph
 
-**Autonomous Claude Code Agent Runner** - A production-ready Python CLI for running Claude as an autonomous software engineering agent.
+**Run Claude as an autonomous coding agent.** Give it a task, and watch it work through your entire codebase.
 
 [![PyPI version](https://badge.fury.io/py/ralph-agent.svg)](https://badge.fury.io/py/ralph-agent)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Features
+---
 
-- **Flexible Input** - Run from prompts, PRD files, plan directories, or JSON configs
-- **PRD & Plans Generation** - Generate PRDs and phased plans from natural language prompts
-- **Multi-Project Support** - Work on multiple projects simultaneously without interference
-- **Persistent State** - Track progress across sessions with automatic resume
-- **Smart Parsing** - Parse markdown plans and PRDs to extract phases and tasks
-- **Globally Unique Task IDs** - Reliable task tracking across all phases and files
-- **Completion Detection** - Structured output markers for reliable task tracking
-- **Auto Checkboxes** - Automatically update `[ ]` to `[x]` in source files
-- **Retry Logic** - Exponential backoff with configurable retry attempts
-- **Rich Terminal UI** - Beautiful progress bars, status panels, and task tables
-- **Resume Capability** - Continue interrupted sessions from exactly where you left off
+## Quick Start (30 seconds)
+
+```bash
+# Install
+pip install ralph-agent
+
+# Run with a simple prompt
+ralph run --prompt "Add a dark mode toggle to the settings page"
+```
+
+That's it. Ralph will autonomously implement the feature, make commits, and report when done.
+
+---
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Usage Patterns](#usage-patterns)
+  - [Single Task](#1-single-task-simplest)
+  - [Multi-Phase Project](#2-multi-phase-project-recommended)
+  - [Generate from Idea](#3-generate-from-idea-full-workflow)
+- [Commands Reference](#commands-reference)
+- [Plan File Format](#plan-file-format)
+- [Configuration](#configuration)
+- [How It Works](#how-it-works)
+
+---
 
 ## Installation
 
-### From PyPI
+### From PyPI (Recommended)
 
 ```bash
 pip install ralph-agent
@@ -31,371 +47,342 @@ pip install ralph-agent
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/ralph-agent.git
+git clone https://github.com/anthropics/ralph-agent.git
 cd ralph-agent
 pip install -e .
 ```
 
-## Quick Start
+### Requirements
 
-### Option 1: Direct Prompt (Fastest)
+- Python 3.9+
+- [Claude CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
+- macOS or Linux
 
-Run a single task immediately:
+---
+
+## Usage Patterns
+
+### 1. Single Task (Simplest)
+
+Run a one-off task immediately:
 
 ```bash
-ralph run --prompt "Add a logout button to the navbar"
+ralph run --prompt "Add input validation to the login form"
 ```
 
-### Option 2: Initialize a Project (Recommended)
+### 2. Multi-Phase Project (Recommended)
 
-**Step 1:** Initialize Ralph in your project:
+For larger features, break work into phases and tasks:
+
+**Step 1:** Initialize Ralph in your project
 
 ```bash
 cd your-project
 ralph init
 ```
 
-This creates:
-```
-.ide/tasks/plans/       # Your plan files go here
-.ralph/                 # State directory
-.ide/ralph.json         # Configuration
-```
-
-**Step 2:** Edit the example plan file `.ide/tasks/plans/00-overview.md`:
+**Step 2:** Edit `.ide/tasks/plans/00-overview.md`
 
 ```markdown
-# Project: My Feature
+# Project: User Authentication
 
 ## Phase 1: Setup
-- [ ] Task 1: Initialize the component structure
-- [ ] Task 2: Add basic styling
+- [ ] TASK-101: Create user database schema
+- [ ] TASK-102: Set up authentication middleware
 
 ## Phase 2: Implementation
-- [ ] Task 3: Implement core functionality
-- [ ] Task 4: Add error handling
+- [ ] TASK-201: Build login endpoint
+- [ ] TASK-202: Build registration endpoint
+- [ ] TASK-203: Add password reset flow
 
-## Phase 3: Polish
-- [ ] Task 5: Add tests
-- [ ] Task 6: Update documentation
+## Phase 3: Testing
+- [ ] TASK-301: Write unit tests
+- [ ] TASK-302: Add integration tests
 ```
 
-**Step 3:** Run Ralph:
+**Step 3:** Run Ralph
 
 ```bash
 ralph run
 ```
 
-Ralph will:
-1. Parse your plan files
-2. Pick the first pending task
-3. Run Claude to implement it
-4. Mark the checkbox `[x]` when done
-5. Repeat until all tasks complete
+Ralph will work through each task, checking off boxes as it completes them.
 
-**Step 4:** Monitor progress:
+**Step 4:** Monitor progress
 
 ```bash
-# Check current status
-ralph status
-
-# See detailed task list
-ralph tasks
-
-# View iteration history
-ralph history
+ralph status          # Quick summary
+ralph tasks           # See all tasks
+ralph history         # View iteration log
 ```
 
-### Option 3: Use a PRD File
+### 3. Generate from Idea (Full Workflow)
+
+Let Claude help you plan before executing:
 
 ```bash
-ralph run --prd ./docs/my-feature-prd.md -m 30
+# Step 1: Generate a PRD from your idea
+ralph generate prd --prompt "Build a REST API for task management with teams"
+
+# Step 2: Review PRD.md, edit if needed
+
+# Step 3: Convert PRD to executable plans
+ralph generate plans --from-prd ./PRD.md
+
+# Step 4: Execute the plans
+ralph run --plans ./plans/
 ```
 
-### Option 4: Use a Config File
+---
 
-```bash
-ralph run --config ./ralph.json
-```
+## Commands Reference
 
-### Resuming Work
+### Core Commands
 
-If interrupted (Ctrl+C or timeout), simply re-run the same command:
+| Command | Description | Example |
+|---------|-------------|---------|
+| `ralph run` | Execute tasks | `ralph run --prompt "Fix the bug"` |
+| `ralph status` | Show progress | `ralph status --detailed` |
+| `ralph resume` | Continue interrupted work | `ralph resume` |
 
-```bash
-# Original run
-ralph run --plans ./my-feature/
+### Generation Commands
 
-# ... interrupted ...
+| Command | Description | Example |
+|---------|-------------|---------|
+| `ralph generate prd` | Create PRD from prompt | `ralph generate prd -p "Auth system"` |
+| `ralph generate plans` | Create phased plans | `ralph generate plans --from-prd ./PRD.md` |
 
-# Resume - just run the same command again
-ralph run --plans ./my-feature/
-```
+### Utility Commands
 
-Ralph automatically:
-1. Recognizes this is the same project (by input source)
-2. Loads existing state from `.ralph/projects/<id>/`
-3. Continues from the last incomplete task
-4. Preserves iteration history
+| Command | Description | Example |
+|---------|-------------|---------|
+| `ralph init` | Initialize project | `ralph init` |
+| `ralph tasks` | List all tasks | `ralph tasks --status pending` |
+| `ralph history` | Show iteration log | `ralph history -n 20` |
+| `ralph projects` | List all projects | `ralph projects` |
+| `ralph validate` | Check plan file | `ralph validate ./plan.md` |
+| `ralph reset` | Clear state | `ralph reset --yes` |
 
-You can also use the legacy resume command:
+---
 
-```bash
-ralph resume
-```
+### `ralph run`
 
-### Dry Run (Preview Only)
-
-See what tasks would be executed without running:
-
-```bash
-ralph run --plans ./phases/ --dry-run
-```
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `ralph run` | Run autonomous agent with various input sources |
-| `ralph generate prd` | Generate a PRD from a natural language prompt |
-| `ralph generate plans` | Generate phased implementation plans |
-| `ralph init` | Initialize Ralph in a project |
-| `ralph status` | Show current progress and phase status |
-| `ralph projects` | List all projects and their progress |
-| `ralph resume` | Continue an interrupted session |
-| `ralph history` | Show iteration history |
-| `ralph tasks` | List all tasks with their status |
-| `ralph validate` | Validate a plan or PRD file |
-| `ralph reset` | Reset state and start fresh |
-
-## Usage
-
-### `ralph run` - Main Command
+The main command. Runs Claude autonomously on your tasks.
 
 ```bash
 ralph run [OPTIONS]
-
-Input Sources (choose one):
-  --prompt, -p TEXT        Direct prompt to execute
-  --prd FILE               PRD markdown file to parse
-  --plans DIR              Directory containing plan files
-  --files FILE...          Specific plan files to parse
-  --config, -c FILE        JSON configuration file
-
-Execution Options:
-  --max, -m INT            Max iterations [default: 50]
-  --timeout, -t INT        Idle timeout seconds [default: 60]
-  --sleep, -s INT          Sleep between iterations [default: 2]
-  --retry INT              Max retries on failure [default: 3]
-  --model TEXT             Claude model to use
-
-Output Options:
-  --quiet, -q              Minimal output
-  --verbose, -v            Verbose output
-  --log-file FILE          Write logs to file
-
-Behavior Options:
-  --dry-run                Parse and plan but don't execute
-  --no-commit              Don't auto-commit changes
-  --no-state               Don't persist state
-  --yes, -y                Auto-confirm prompts
 ```
 
-### Examples
+**Input Options** (pick one):
+
+| Option | Description |
+|--------|-------------|
+| `--prompt, -p` | Direct task description |
+| `--plans` | Directory of plan files |
+| `--prd` | PRD markdown file |
+| `--files` | Specific plan files |
+| `--config, -c` | JSON config file |
+
+**Execution Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--max, -m` | 50 | Max iterations |
+| `--timeout, -t` | 60 | Seconds to wait for Claude |
+| `--model` | - | Claude model to use |
+| `--dry-run` | - | Preview without executing |
+| `--no-commit` | - | Skip auto-commits |
+| `--yes, -y` | - | Auto-confirm prompts |
+
+**Examples:**
 
 ```bash
-# Quick task with prompt
-ralph run -p "Add user authentication with JWT"
+# Simple prompt
+ralph run -p "Add logout button"
 
-# PRD implementation with 30 max iterations
-ralph run --prd ./docs/user-auth-prd.md -m 30
-
-# Phased development with verbose output
-ralph run --plans ./.ide/tasks/plans/ --verbose
-
-# Dry run to preview tasks
-ralph run --plans ./phases/ --dry-run
-
-# Resume after interruption (re-run same command)
+# From plans directory
 ralph run --plans ./my-feature/
 
-# List all projects
-ralph projects
+# With custom settings
+ralph run --plans ./plans/ --max 100 --timeout 120
 
-# Check detailed progress
-ralph status --detailed
+# Preview only (no execution)
+ralph run --plans ./plans/ --dry-run
 
-# View iteration history
-ralph history -n 20
-
-# List pending tasks only
-ralph tasks --status pending
+# Auto-confirm all prompts
+ralph run --plans ./plans/ --yes
 ```
 
-### `ralph generate` - Generate PRDs and Plans
+---
 
-Generate PRDs and phased implementation plans from natural language prompts. Claude runs interactively to create structured documents.
+### `ralph generate prd`
 
-#### Generate PRD
+Generate a Product Requirements Document from a natural language description.
 
 ```bash
 ralph generate prd [OPTIONS]
-
-Options:
-  --prompt, -p TEXT      Prompt describing the feature/project
-  --from-file, -f TEXT   Path to prompt file (.txt, .md)
-  --output, -o TEXT      Output file path [default: ./PRD.md]
-  --name, -n TEXT        Project name
-  --model TEXT           Claude model to use
-  --timeout, -t INT      Seconds to wait for Claude [default: 60]
-  --dry-run              Show prompt without generating
-  --dir, -d TEXT         Working directory [default: .]
 ```
 
-#### Generate Plans
+| Option | Description |
+|--------|-------------|
+| `--prompt, -p` | Feature description |
+| `--from-file, -f` | Read prompt from file |
+| `--output, -o` | Output path (default: `./PRD.md`) |
+| `--name, -n` | Project name |
+| `--dry-run` | Preview prompt only |
+
+**Examples:**
+
+```bash
+# From prompt
+ralph generate prd -p "User authentication with OAuth and JWT"
+
+# From file
+ralph generate prd -f ./requirements.txt -o ./docs/PRD.md
+
+# Preview what will be sent to Claude
+ralph generate prd -p "New feature" --dry-run
+```
+
+---
+
+### `ralph generate plans`
+
+Generate phased implementation plans from a prompt or PRD.
 
 ```bash
 ralph generate plans [OPTIONS]
-
-Options:
-  --prompt, -p TEXT      Prompt describing the feature/project
-  --from-file, -f TEXT   Path to prompt file (.txt, .md)
-  --from-prd TEXT        Convert PRD file to plans
-  --output, -o TEXT      Output directory path [default: ./plans]
-  --name, -n TEXT        Project name
-  --phases INT           Number of phases to generate (default: auto)
-  --max-tasks INT        Maximum tasks per phase [default: 10]
-  --model TEXT           Claude model to use
-  --timeout, -t INT      Seconds to wait for Claude [default: 60]
-  --dry-run              Show prompt without generating
-  --dir, -d TEXT         Working directory [default: .]
 ```
 
-#### Generation Examples
+| Option | Description |
+|--------|-------------|
+| `--prompt, -p` | Feature description |
+| `--from-file, -f` | Read prompt from file |
+| `--from-prd` | Convert existing PRD to plans |
+| `--output, -o` | Output directory (default: `./plans`) |
+| `--phases` | Number of phases (default: auto) |
+| `--max-tasks` | Max tasks per phase (default: 10) |
+| `--dry-run` | Preview prompt only |
+
+**Examples:**
 
 ```bash
-# Generate PRD from a prompt
-ralph generate prd --prompt "User authentication system with OAuth support"
+# From prompt
+ralph generate plans -p "Refactor authentication system"
 
-# Generate PRD from a requirements file
-ralph generate prd --from-file ./requirements.txt --output ./docs/PRD.md
+# From PRD file
+ralph generate plans --from-prd ./PRD.md -o ./.ide/tasks/plans/
 
-# Generate phased plans from a prompt
-ralph generate plans --prompt "Refactor the authentication system"
-
-# Convert existing PRD to phased plans
-ralph generate plans --from-prd ./docs/PRD.md --output ./plans/
-
-# Generate plans with specific number of phases
-ralph generate plans --prompt "Build a REST API" --phases 4
-
-# Preview the prompt without generating (dry run)
-ralph generate prd --prompt "New feature" --dry-run
+# Specify number of phases
+ralph generate plans -p "Build REST API" --phases 4
 ```
 
-#### Typical Workflow
+---
+
+### `ralph status`
+
+Show current project progress.
 
 ```bash
-# Step 1: Generate PRD from your idea
-ralph generate prd --prompt "Build a task management system with teams"
-
-# Step 2: Review and edit PRD.md as needed
-
-# Step 3: Generate phased plans from PRD
-ralph generate plans --from-prd ./PRD.md --output ./.ide/tasks/plans/
-
-# Step 4: Run Ralph to execute the plans
-ralph run --plans ./.ide/tasks/plans/
+ralph status [OPTIONS]
 ```
 
-## How It Works
+| Option | Description |
+|--------|-------------|
+| `--detailed` | Show all tasks |
+| `--json` | Output as JSON |
+| `--dir, -d` | Working directory |
 
+---
+
+### `ralph tasks`
+
+List all tasks with their status.
+
+```bash
+ralph tasks [OPTIONS]
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                       RALPH EXECUTION LOOP                       │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│   ┌──────────┐     ┌──────────┐     ┌──────────┐                │
-│   │  Parse   │────▶│  Select  │────▶│ Execute  │                │
-│   │  Input   │     │   Task   │     │  Claude  │                │
-│   └──────────┘     └──────────┘     └──────────┘                │
-│        │                                   │                     │
-│        │           ┌──────────┐           │                     │
-│        │           │  Parse   │◀──────────┘                     │
-│        │           │  Output  │                                  │
-│        │           └──────────┘                                  │
-│        │                │                                        │
-│        ▼                ▼                                        │
-│   ┌──────────┐     ┌──────────┐     ┌──────────┐                │
-│   │  State   │◀───▶│  Update  │────▶│  Next    │                │
-│   │  Store   │     │  Status  │     │ Iteration│                │
-│   └──────────┘     └──────────┘     └──────────┘                │
-│                                           │                      │
-│                          ┌────────────────┘                      │
-│                          ▼                                       │
-│                    ✓ PROJECT_COMPLETE                            │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+
+| Option | Description |
+|--------|-------------|
+| `--status` | Filter: `pending`, `completed`, `failed`, `blocked` |
+| `--dir, -d` | Working directory |
+
+**Examples:**
+
+```bash
+ralph tasks                    # All tasks
+ralph tasks --status pending   # Only pending
+ralph tasks --status completed # Only completed
 ```
+
+---
+
+### `ralph resume`
+
+Continue an interrupted session.
+
+```bash
+ralph resume [OPTIONS]
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--max, -m` | 50 | Additional iterations |
+| `--dir, -d` | `.` | Working directory |
+
+> **Tip:** You can also just re-run the original command. Ralph auto-detects and resumes.
+
+---
 
 ## Plan File Format
 
-Ralph parses markdown files with this structure:
+Ralph parses markdown files with phases and tasks:
 
 ```markdown
 # Project: My Feature
 
 ## Phase 1: Setup
-Status: IN_PROGRESS
+- [ ] TASK-101: Initialize project structure
+- [ ] TASK-102: Configure dependencies
 
-- [x] TASK-101: Initialize project structure
-  - Priority: High
-  - Description: Set up Next.js with TypeScript
+## Phase 2: Core Implementation
+- [ ] TASK-201: Build the main component
+- [ ] TASK-202: Add state management
+- [ ] TASK-203: Connect to API
 
-- [ ] TASK-102: Configure database
-  - Priority: High
-  - Dependencies: TASK-101
-
-## Phase 2: Implementation
-
-- [ ] TASK-201: Create user model
-  - Priority: Medium
-  - Dependencies: TASK-102
+## Phase 3: Polish
+- [ ] TASK-301: Add error handling
+- [ ] TASK-302: Write tests
+- [ ] TASK-303: Update documentation
 ```
 
 ### Task ID Convention
 
-**IMPORTANT:** Task IDs must be globally unique across all files:
+Use globally unique IDs across all files:
 
-- Phase 1: `TASK-101`, `TASK-102`, `TASK-103`, etc.
-- Phase 2: `TASK-201`, `TASK-202`, `TASK-203`, etc.
-- Phase 3: `TASK-301`, `TASK-302`, `TASK-303`, etc.
+- Phase 1: `TASK-101`, `TASK-102`, `TASK-103`
+- Phase 2: `TASK-201`, `TASK-202`, `TASK-203`
+- Phase 3: `TASK-301`, `TASK-302`, `TASK-303`
 
-If task IDs are omitted, Ralph auto-generates unique IDs, but explicit IDs are recommended for clarity and reliable dependency tracking.
+### Task Metadata (Optional)
 
-## PRD Format Support
+Add details under each task:
 
 ```markdown
-# Product Requirements Document: User Authentication
-
-## Overview
-Implement secure user authentication.
-
-## User Stories
-
-### US-001: As a user, I want to sign up
-**Priority:** High
-**Status:** Pending
-
-#### Acceptance Criteria
-- [ ] User can enter email and password
-- [ ] Validation for email format
-- [ ] Password strength requirements
+- [ ] TASK-101: Create user authentication
+  - Priority: High
+  - Description: Implement JWT-based auth with refresh tokens
+  - Dependencies: TASK-100
 ```
+
+---
 
 ## Configuration
 
-### Project Config (`ralph.json`)
+### Config File (`ralph.json`)
+
+Create a config file for repeated use:
 
 ```json
 {
@@ -427,86 +414,108 @@ Implement secure user authentication.
 }
 ```
 
-## State Management
-
-### Multi-Project Isolation
-
-Ralph supports multiple concurrent projects without interference. Each input source gets its own isolated state directory:
-
-```
-.ralph/
-└── projects/
-    ├── a92f5b03.../       # Project from ./plans/feature-a/
-    │   ├── state.json
-    │   └── status.json
-    ├── 7c8d9e01.../       # Project from ./plans/feature-b/
-    │   ├── state.json
-    │   └── status.json
-    └── 37ae55ff.../       # Project from --prompt "Fix bug"
-        ├── state.json
-        └── status.json
-```
-
-### Project Identity
-
-Projects are identified by their input source:
-
-| Input Type | Identity Based On | Same Input = Same Project? |
-|------------|-------------------|---------------------------|
-| `--plans ./dir/` | Directory path | ✓ Yes |
-| `--prd ./file.md` | File path | ✓ Yes |
-| `--prompt "text"` | Prompt text hash | ✓ Yes |
-| `--config ./file.json` | Config file path | ✓ Yes |
-
-This means:
-- Running `ralph run --plans ./my-feature/` twice **continues** from where you left off
-- Running `ralph run --plans ./different-feature/` is a **separate project**
-- Both can run without interfering with each other
-
-### List All Projects
+Then run:
 
 ```bash
-$ ralph projects
-
-Ralph Projects (2 total)
-
-ID         Name              Status       Progress    Source
-a92f5b03   feature-a         in_progress  5/12        ...plans/feature-a
-7c8d9e01   feature-b         pending      0/8         ...plans/feature-b
+ralph run --config ./ralph.json
 ```
 
-### State File Structure
+---
 
-Each project's `state.json`:
-
-```json
-{
-  "version": "1.0",
-  "name": "my-project",
-  "status": "in_progress",
-  "phases": [...],
-  "iterations": [...],
-  "total_tasks": 25,
-  "completed_tasks": 12
-}
-```
-
-## Architecture
+## How It Works
 
 ```
-ralph/
-├── cli.py           # CLI commands (run, status, resume, projects, generate)
-├── input/           # Input handlers (prompt, prd, plans, config)
-├── parser/          # Markdown & checkbox parsing
-├── state/           # State management
-│   ├── models.py    # Data models (Project, Phase, Task)
-│   ├── store.py     # Persistent storage with multi-project support
-│   ├── tracker.py   # Progress tracking
-│   └── identity.py  # Project identity generation
-├── executor/        # Claude execution (prompt, output, retry)
-├── generator/       # PRD & plans generation (prd, plans, templates)
-└── utils/           # File and git utilities
+┌─────────────────────────────────────────────────────────────┐
+│                    RALPH EXECUTION LOOP                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│   1. PARSE          2. SELECT          3. EXECUTE           │
+│   ┌─────────┐       ┌─────────┐       ┌─────────┐          │
+│   │  Plans  │──────▶│  Next   │──────▶│ Claude  │          │
+│   │  /PRD   │       │  Task   │       │   CLI   │          │
+│   └─────────┘       └─────────┘       └─────────┘          │
+│                                             │               │
+│   6. REPEAT         5. UPDATE          4. PARSE            │
+│   ┌─────────┐       ┌─────────┐       ┌─────────┐          │
+│   │  Next   │◀──────│  Mark   │◀──────│ Output  │          │
+│   │  Task   │       │  Done   │       │ Stream  │          │
+│   └─────────┘       └─────────┘       └─────────┘          │
+│                                                              │
+│                     ✓ All tasks complete                     │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+1. **Parse** - Read plans, PRD, or prompt
+2. **Select** - Pick the next pending task
+3. **Execute** - Run Claude with task context
+4. **Parse** - Monitor output for completion
+5. **Update** - Mark task done, update checkboxes
+6. **Repeat** - Continue until all tasks complete
+
+---
+
+## Multi-Project Support
+
+Ralph tracks multiple projects independently:
+
+```bash
+# Work on feature A
+ralph run --plans ./feature-a/
+
+# Work on feature B (separate state)
+ralph run --plans ./feature-b/
+
+# See all projects
+ralph projects
+```
+
+Each input source gets isolated state in `.ralph/projects/`.
+
+---
+
+## Tips & Best Practices
+
+### Writing Good Tasks
+
+```markdown
+# Good - Specific and actionable
+- [ ] TASK-101: Add email validation to signup form with error messages
+
+# Bad - Too vague
+- [ ] TASK-101: Fix signup
+```
+
+### Handling Interruptions
+
+If Ralph is interrupted (Ctrl+C, timeout, etc.):
+
+```bash
+# Just run the same command again
+ralph run --plans ./my-feature/
+
+# Or use resume
+ralph resume
+```
+
+Ralph automatically continues from where it stopped.
+
+### Dry Run First
+
+Preview what will happen before executing:
+
+```bash
+ralph run --plans ./plans/ --dry-run
+```
+
+### Monitor Long Runs
+
+In another terminal:
+
+```bash
+watch ralph status --detailed
+```
+
+---
 
 ## Development
 
@@ -525,11 +534,7 @@ make format
 make build
 ```
 
-## Requirements
-
-- Python 3.9+
-- Claude CLI installed and authenticated
-- macOS or Linux (uses pexpect)
+---
 
 ## License
 
