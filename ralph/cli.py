@@ -764,8 +764,7 @@ def generate_prd(
     result = generator.generate(context)
 
     if result.success:
-        ui.console.print("[green]PRD generated successfully![/green]")
-        ui.console.print(f"Output: {result.output_path}")
+        ui.console.print("\n[green]Done![/green]")
 
         if result.warnings:
             ui.console.print("\n[yellow]Warnings:[/yellow]")
@@ -902,19 +901,9 @@ def generate_plans(
         result = generator.generate(context)
 
     if result.success:
-        ui.console.print("[green]Plans generated successfully![/green]")
-        ui.console.print(f"Output directory: {result.output_path}")
-        ui.console.print(f"Files created: {len(result.files)}")
-
-        for filename in sorted(result.files.keys()):
-            ui.console.print(f"  - {filename}")
-
-        if result.warnings:
-            ui.console.print("\n[yellow]Warnings:[/yellow]")
-            for warning in result.warnings:
-                ui.console.print(f"  - {warning}")
+        ui.console.print("\n[green]Done![/green]")
     else:
-        ui.print_error("Plans generation failed")
+        ui.print_error("Generation failed")
         for error in result.errors:
             ui.console.print(f"  - {error}")
         raise typer.Exit(1)
