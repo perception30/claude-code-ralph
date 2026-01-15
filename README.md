@@ -12,7 +12,7 @@
 
 ```bash
 # Install
-pip install ralph-agent
+pipx install ralph-agent  # or: pip install ralph-agent
 
 # Run with a simple prompt
 ralph run --prompt "Add a dark mode toggle to the settings page"
@@ -41,6 +41,10 @@ That's it. Ralph will autonomously implement the feature, make commits, and repo
 ### From PyPI (Recommended)
 
 ```bash
+# Using pipx (recommended for CLI tools)
+pipx install ralph-agent
+
+# Or using pip
 pip install ralph-agent
 ```
 
@@ -124,10 +128,10 @@ Let Claude help you plan before executing:
 # Step 1: Generate a PRD from your idea
 ralph generate prd --prompt "Build a REST API for task management with teams"
 
-# Step 2: Review PRD.md, edit if needed
+# Step 2: Review PRDs/, edit if needed
 
-# Step 3: Convert PRD to executable plans
-ralph generate plans --from-prd ./PRD.md
+# Step 3: Convert PRD to executable plans (or run directly on PRDs)
+ralph generate plans --from-prd ./PRDs/
 
 # Step 4: Execute the plans
 ralph run --plans ./plans/
@@ -227,7 +231,7 @@ ralph generate prd [OPTIONS]
 |--------|-------------|
 | `--prompt, -p` | Feature description |
 | `--from-file, -f` | Read prompt from file |
-| `--output, -o` | Output path (default: `./PRD.md`) |
+| `--output, -o` | Output directory (default: `./PRDs`) |
 | `--name, -n` | Project name |
 | `--dry-run` | Preview prompt only |
 
