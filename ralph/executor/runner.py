@@ -29,11 +29,13 @@ class ClaudeRunner:
         idle_timeout: int = 10,
         model: Optional[str] = None,
         skip_permissions: bool = True,
+        expected_task_id: Optional[str] = None,
     ):
         self.working_dir = os.path.abspath(working_dir)
         self.idle_timeout = idle_timeout
         self.model = model
         self.skip_permissions = skip_permissions
+        self.expected_task_id = expected_task_id
         self.process: Optional[pexpect.spawn] = None
         self._interrupted = False
 
@@ -83,10 +85,12 @@ class ClaudeRunner:
                     timeout = post_status_idle_timeout if status_detected else self.idle_timeout
                     self.process.expect(r'.+', timeout=timeout)
 
-                    # Check if Claude wrote the status file
+                    # Check if Claude wrote the status file FOR THIS TASK
+                    # Validates task_id to prevent cross-process interference
                     if status_file.exists() and not status_detected:
-                        status_detected = True
-                        post_status_start = time.time()
+                        if self._is_our_status_file(status_file):
+                            status_detected = True
+                            post_status_start = time.time()
 
                     # Check max wait after status (fallback)
                     if status_detected and post_status_start:
@@ -131,6 +135,27 @@ class ClaudeRunner:
                 except OSError:
                     pass
                 self.process = None
+
+    def _is_our_status_file(self, status_file: Path) -> bool:
+        """Check if status file belongs to this process.
+
+        Validates that the task_id in the status file matches our expected task.
+        This prevents race conditions where one process reads another's status.
+        If no expected_task_id is set, accepts any status file (legacy behavior).
+        """
+        if not self.expected_task_id:
+            # Legacy mode: accept any status file
+            return True
+
+        try:
+            data = json.loads(status_file.read_text())
+            file_task_id = data.get("task_id")
+
+            # Check if task_id matches (works for COMPLETED, BLOCKED, FAILED, PROJECT_COMPLETE)
+            return bool(file_task_id == self.expected_task_id)
+        except (OSError, json.JSONDecodeError):
+            # File might be partially written, ignore for now
+            return False
 
     def _read_status_file(self, status_file: Path, output: str) -> ParsedOutput:
         """Read status from file written by Claude."""
@@ -288,6 +313,7 @@ class RalphExecutor:
                 idle_timeout=self.idle_timeout,
                 model=self.model,
                 skip_permissions=self.skip_permissions,
+                expected_task_id=next_task.id,
             )
             success, output, parsed = self._current_runner.run(prompt)
 

@@ -43,7 +43,9 @@ Create a PRD using the phased plan format for direct executability:
 6. When done, write status to `.ralph/status.json`:
    {{"status": "COMPLETED", "task_id": "generate-prd"}}
 
-Now create the PRD files.
+Before creating the PRD, review all the relevant code paths/modules and deep analyze to gather context and understand the scope of the request. Ask users for clarifications if there are any gaps in understanding, or ambiguous requirements.
+
+Then, create the PRD files.
 '''
 
 # Plans Generation Template - Claude writes files directly
@@ -77,7 +79,9 @@ Write plan files to: {output_path}
 5. When done, write status to `.ralph/status.json`:
    {{"status": "COMPLETED", "task_id": "generate-plans"}}
 
-Now create the plan files.
+Before creating the phased plan files, review all the relevant code paths/modules and deep analyze to gather context and understand the scope of the request. Ask users for clarifications if there are any gaps in understanding, or ambiguous requirements.
+
+Then, proceed to create the phased plan files.
 '''
 
 # PRD to Plans Conversion Template

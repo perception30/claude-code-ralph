@@ -29,6 +29,7 @@ class PlansGenerator(Generator):
             model=model,
             idle_timeout=idle_timeout,
             working_dir=working_dir,
+            expected_task_id="generate-plans",
         )
         self.executor = GeneratorExecutor(exec_config)
 

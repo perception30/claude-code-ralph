@@ -55,7 +55,7 @@ If blocked or failed:
 
 If ALL project tasks are done:
 ```json
-{{"status": "PROJECT_COMPLETE"}}
+{{"status": "PROJECT_COMPLETE", "task_id": "{task_id}"}}
 ```
 {custom_section}
 Now implement the task carefully. Be thorough but efficient.'''

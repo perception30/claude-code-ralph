@@ -1,6 +1,7 @@
 """Execute Claude for generation tasks."""
 
 import io
+import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +17,7 @@ class GenerationExecutionConfig:
     idle_timeout: int = 60
     working_dir: str = "."
     skip_permissions: bool = True
+    expected_task_id: Optional[str] = None
 
 
 class TeeWriter:
@@ -43,6 +45,30 @@ class GeneratorExecutor:
     def __init__(self, config: Optional[GenerationExecutionConfig] = None):
         self.config = config or GenerationExecutionConfig()
         self.process: Optional[pexpect.spawn] = None
+
+    def _is_our_status_file(self, status_file: Path) -> bool:
+        """Check if status file belongs to this process.
+
+        Validates that the task_id in the status file matches our expected task.
+        This prevents race conditions where one process reads another's status.
+        """
+        if not self.config.expected_task_id:
+            # Legacy mode: accept any status file
+            return True
+
+        try:
+            data = json.loads(status_file.read_text())
+            file_task_id = data.get("task_id")
+            status = data.get("status", "").upper()
+
+            # COMPLETED status with matching task_id
+            if status == "COMPLETED" and file_task_id == self.config.expected_task_id:
+                return True
+
+            return False
+        except (OSError, json.JSONDecodeError):
+            # File might be partially written, ignore for now
+            return False
 
     def execute(self, prompt: str) -> tuple[bool, str]:
         """Execute Claude with the generation prompt."""
@@ -81,8 +107,9 @@ class GeneratorExecutor:
                 try:
                     self.process.expect(r'.+', timeout=self.config.idle_timeout)
 
-                    # Check if Claude wrote status file
-                    if status_file.exists():
+                    # Check if Claude wrote status file FOR THIS TASK
+                    # Validates task_id to prevent cross-process interference
+                    if status_file.exists() and self._is_our_status_file(status_file):
                         break
 
                 except pexpect.TIMEOUT:
