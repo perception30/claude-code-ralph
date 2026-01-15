@@ -2,8 +2,7 @@
 
 import os
 import signal
-import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
 import pexpect

@@ -1,12 +1,10 @@
 """Ralph CLI - Autonomous Claude Code Agent Runner."""
 
 import os
-import sys
 from pathlib import Path
 from typing import Optional, List
 
 import typer
-from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
@@ -156,12 +154,10 @@ def run(
 
     # Determine input source and parse
     project = None
-    direct_prompt = None
     source_files = []
 
     if prompt:
         # Direct prompt
-        direct_prompt = prompt
         input_source = PromptInput(prompt=prompt)
         result = input_source.parse()
         if result.is_valid:

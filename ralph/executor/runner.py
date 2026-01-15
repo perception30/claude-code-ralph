@@ -1,5 +1,6 @@
 """Simple Claude runner - spawn and let it run."""
 
+import json
 import os
 import signal
 import sys
@@ -10,8 +11,8 @@ import pexpect
 
 from .prompt import PromptBuilder, ExecutionContext
 from .output import OutputParser, ParsedOutput
-from .retry import RetryStrategy, RetryConfig, RetryResult
-from ..state.models import Project, TaskStatus
+from .retry import RetryConfig
+from ..state.models import Project
 from ..state.store import StateStore
 from ..state.tracker import ProgressTracker
 from ..parser.checkbox import CheckboxUpdater
@@ -23,7 +24,7 @@ class ClaudeRunner:
     def __init__(
         self,
         working_dir: str = ".",
-        idle_timeout: int = 60,
+        idle_timeout: int = 10,
         model: Optional[str] = None,
         skip_permissions: bool = True,
     ):
@@ -40,6 +41,11 @@ class ClaudeRunner:
         Simply spawns the process and lets it output to terminal.
         """
         self._interrupted = False
+        status_file = Path(self.working_dir) / ".ralph" / "status.json"
+
+        # Clear status file before run
+        if status_file.exists():
+            status_file.unlink()
 
         # Build command args
         args = []
@@ -61,35 +67,22 @@ class ClaudeRunner:
             # Let it output directly to stdout
             self.process.logfile_read = sys.stdout.buffer
 
-            # Wait for completion markers, EOF, or timeout
-            # Pattern 0: TASK_STATUS marker (task done)
-            # Pattern 1: PROJECT_COMPLETE marker
-            # Pattern 2: EOF (process ended)
-            # Pattern 3: TIMEOUT (idle too long)
-            patterns = [
-                r'TASK_STATUS:\s*(COMPLETED|FAILED|BLOCKED)',
-                r'PROJECT_COMPLETE',
-                pexpect.EOF,
-                pexpect.TIMEOUT,
-            ]
+            # Keep waiting while there's output (like expect's exp_continue)
+            # Exit when idle (no output for idle_timeout seconds)
+            while True:
+                try:
+                    self.process.expect(r'.+', timeout=self.idle_timeout)
+                except pexpect.TIMEOUT:
+                    # No output for idle_timeout - Claude is idle
+                    break
+                except pexpect.EOF:
+                    # Process ended
+                    break
 
-            index = self.process.expect(patterns)
-
-            # If we matched a completion pattern (not EOF), send /exit
-            if index in (0, 1) and self.process.isalive():
-                # Brief pause to let any final output flush
-                import time
-                time.sleep(0.5)
+            if self.process.isalive():
                 self.process.sendline("/exit")
                 try:
                     self.process.expect(pexpect.EOF, timeout=10)
-                except:
-                    self.process.terminate(force=True)
-            elif index == 3 and self.process.isalive():
-                # Timeout - send exit
-                self.process.sendline("/exit")
-                try:
-                    self.process.expect(pexpect.EOF, timeout=5)
                 except:
                     self.process.terminate(force=True)
 
@@ -98,7 +91,8 @@ class ClaudeRunner:
             if self.process.before:
                 output = self.process.before.decode('utf-8', errors='ignore') if isinstance(self.process.before, bytes) else self.process.before
 
-            parsed = OutputParser.parse(output)
+            # Read status from file (Claude writes here when done)
+            parsed = self._read_status_file(status_file, output)
             return (True, output, parsed)
 
         except Exception as e:
@@ -112,6 +106,48 @@ class ClaudeRunner:
                 except:
                     pass
                 self.process = None
+
+    def _read_status_file(self, status_file: Path, output: str) -> ParsedOutput:
+        """Read status from file written by Claude."""
+        parsed = ParsedOutput(raw_output=output)
+
+        if status_file.exists():
+            try:
+                data = json.loads(status_file.read_text())
+                status = data.get("status", "").upper()
+
+                if status == "COMPLETED":
+                    parsed.task_completed = True
+                    parsed.task_status = "COMPLETED"
+                    parsed.task_id = data.get("task_id")
+                    if parsed.task_id:
+                        parsed.completed_tasks.append(parsed.task_id)
+
+                elif status == "BLOCKED":
+                    parsed.task_status = "BLOCKED"
+                    parsed.task_id = data.get("task_id")
+                    parsed.reason = data.get("reason")
+                    if parsed.task_id:
+                        parsed.blocked_tasks.append(parsed.task_id)
+
+                elif status == "FAILED":
+                    parsed.task_status = "FAILED"
+                    parsed.task_id = data.get("task_id")
+                    parsed.reason = data.get("reason")
+                    if parsed.task_id:
+                        parsed.failed_tasks.append(parsed.task_id)
+
+                elif status == "PROJECT_COMPLETE":
+                    parsed.project_complete = True
+
+            except (json.JSONDecodeError, IOError):
+                pass
+
+        # Fallback: also check output for markers
+        if not parsed.task_completed and not parsed.project_complete:
+            parsed = OutputParser.parse(output)
+
+        return parsed
 
     def interrupt(self) -> None:
         """Interrupt the current run."""
@@ -131,7 +167,7 @@ class RalphExecutor:
         project: Project,
         working_dir: str = ".",
         max_iterations: int = 50,
-        idle_timeout: int = 60,
+        idle_timeout: int = 10,
         sleep_between: int = 2,
         model: Optional[str] = None,
         skip_permissions: bool = True,
@@ -224,15 +260,34 @@ class RalphExecutor:
             status = "success" if parsed.is_success else "failed"
             self.tracker.end_iteration(status=status)
 
-            if parsed.project_complete:
-                return True
-
             if self._interrupted:
                 break
 
+            # Decision based on status file
+            if parsed.project_complete:
+                print("\n  ✓ PROJECT_COMPLETE - All done!")
+                return True
+
+            if parsed.task_status == "BLOCKED":
+                print(f"\n  ⊘ Task BLOCKED: {parsed.reason or 'Unknown'}")
+                break
+
+            if parsed.task_status == "FAILED":
+                print(f"\n  ✗ Task FAILED: {parsed.reason or 'Unknown'}")
+                break
+
+            # Task completed - check if more tasks
+            self.project.update_status()
+            next_task = self.project.get_next_task()
+
+            if not next_task or self.project.is_complete:
+                print("\n  ✓ All tasks completed!")
+                return True
+
+            # More tasks - continue
+            print(f"\n  ✓ Task done. Next: {next_task.name}")
             if iteration < self.max_iterations:
                 import time
-                print(f"\n  Sleeping {self.sleep_between}s before next iteration...")
                 time.sleep(self.sleep_between)
 
         return self.project.is_complete

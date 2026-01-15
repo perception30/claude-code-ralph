@@ -1,14 +1,13 @@
 """Configuration file input handler."""
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from .base import InputSource, InputResult
 from .plans import PlansInput
 from .prd import PRDInput
-from ..state.models import Project
 
 
 @dataclass
@@ -26,7 +25,7 @@ class RalphProjectConfig:
 
     # Execution settings
     max_iterations: int = 50
-    idle_timeout: int = 60
+    idle_timeout: int = 10
     sleep_between: int = 2
     retry_attempts: int = 3
     retry_delay: int = 5

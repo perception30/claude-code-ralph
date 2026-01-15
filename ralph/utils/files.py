@@ -1,8 +1,6 @@
 """File utility functions."""
 
-import os
 from pathlib import Path
-from typing import Optional
 
 
 def ensure_dir(path: str) -> Path:

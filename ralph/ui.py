@@ -1,16 +1,13 @@
 """Rich terminal UI components for Ralph CLI."""
 
-import sys
 from datetime import datetime, timedelta
 from typing import Optional
 
-from rich.console import Console, Group
-from rich.live import Live
+from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 from rich.text import Text
-from rich.style import Style
 from rich.box import ROUNDED, DOUBLE, HEAVY
 
 

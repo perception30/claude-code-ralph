@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
-from ..state.models import Project, Phase, Task, TaskStatus
+from ..state.models import Project, Task, TaskStatus
 
 
 @dataclass
@@ -40,23 +40,20 @@ class PromptBuilder:
 4. **Document** - Update source file checkbox: `- [x]` when task is done
 5. **Commit** - If checks pass: `git commit -m "{commit_prefix} {task_id} - {task_name}"`
 
-## OUTPUT MARKERS
-When task is complete, output exactly:
-```
-TASK_STATUS: COMPLETED
-TASK_ID: {task_id}
+## COMPLETION
+When done, write status to `.ralph/status.json`:
+```json
+{{"status": "COMPLETED", "task_id": "{task_id}"}}
 ```
 
 If blocked or failed:
-```
-TASK_STATUS: BLOCKED|FAILED
-TASK_ID: {task_id}
-REASON: <brief explanation>
+```json
+{{"status": "BLOCKED", "task_id": "{task_id}", "reason": "explanation"}}
 ```
 
 If ALL project tasks are done:
-```
-PROJECT_COMPLETE
+```json
+{{"status": "PROJECT_COMPLETE"}}
 ```
 {custom_section}
 Now implement the task. Be thorough but efficient.'''
@@ -73,15 +70,14 @@ Now implement the task. Be thorough but efficient.'''
 3. Run appropriate quality checks
 4. Commit changes if checks pass
 
-When done, output:
-```
-TASK_STATUS: COMPLETED
+When done, write status to `.ralph/status.json`:
+```json
+{"status": "COMPLETED"}
 ```
 
 If blocked:
-```
-TASK_STATUS: BLOCKED
-REASON: <explanation>
+```json
+{"status": "BLOCKED", "reason": "explanation"}
 ```
 {custom_section}
 Now implement the task.'''
