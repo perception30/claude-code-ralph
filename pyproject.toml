@@ -1,0 +1,74 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ralph-agent"
+version = "1.0.0"
+description = "Ralph - Autonomous Claude Code Agent Runner"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [
+    { name = "Nafeez Khaled", email = "nk.fssoft@gmail.com" }
+]
+keywords = ["cli", "claude", "ai", "autonomous", "agent", "coding"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "rich>=13.0.0",
+    "typer>=0.9.0",
+    "pexpect>=4.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.scripts]
+ralph = "ralph.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/ralph-agent"
+Documentation = "https://github.com/yourusername/ralph-agent#readme"
+Repository = "https://github.com/yourusername/ralph-agent"
+Issues = "https://github.com/yourusername/ralph-agent/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ralph"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/ralph",
+    "/README.md",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
