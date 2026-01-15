@@ -40,6 +40,8 @@ dev = [
     "black>=23.0.0",
     "ruff>=0.1.0",
     "mypy>=1.0.0",
+    "vulture>=2.10",
+    "autoflake>=2.0.0",
 ]
 
 [project.scripts]
