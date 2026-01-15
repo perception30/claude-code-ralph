@@ -16,8 +16,10 @@ class PRDGenerator(Generator):
         self,
         model: Optional[str] = None,
         timeout: int = 300,
+        idle_timeout: int = 60,
         working_dir: str = ".",
         max_retries: int = 2,
+        interactive: bool = True,
     ):
         """
         Initialize PRDGenerator.
@@ -25,13 +27,17 @@ class PRDGenerator(Generator):
         Args:
             model: Optional Claude model to use
             timeout: Execution timeout in seconds
+            idle_timeout: Idle timeout for interactive mode
             working_dir: Working directory
             max_retries: Maximum retry attempts on validation failure
+            interactive: Whether to stream output interactively
         """
         self.model = model
         self.timeout = timeout
+        self.idle_timeout = idle_timeout
         self.working_dir = working_dir
         self.max_retries = max_retries
+        self.interactive = interactive
 
         self.prompt_loader = PromptLoader()
         self.prompt_builder = GeneratorPromptBuilder()
@@ -40,8 +46,10 @@ class PRDGenerator(Generator):
         exec_config = GenerationExecutionConfig(
             model=model,
             timeout=timeout,
+            idle_timeout=idle_timeout,
             working_dir=working_dir,
             max_retries=max_retries,
+            interactive=interactive,
         )
         self.executor = GeneratorExecutor(exec_config)
 

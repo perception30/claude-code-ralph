@@ -695,6 +695,10 @@ def generate_prd(
         None, "--model",
         help="Claude model to use",
     ),
+    idle_timeout: int = typer.Option(
+        60, "--timeout", "-t",
+        help="Seconds to wait for Claude response",
+    ),
     dry_run: bool = typer.Option(
         False, "--dry-run",
         help="Show prompt without generating",
@@ -742,6 +746,7 @@ def generate_prd(
     # Create generator
     generator = PRDGenerator(
         model=model,
+        idle_timeout=idle_timeout,
         working_dir=working_dir,
     )
 
@@ -752,7 +757,9 @@ def generate_prd(
         raise typer.Exit(0)
 
     # Generate
-    ui.console.print("\n[bold]Generating PRD...[/bold]\n")
+    print(f"\n{'='*60}")
+    print("  Generating PRD")
+    print(f"{'='*60}\n")
 
     result = generator.generate(context)
 
@@ -805,6 +812,10 @@ def generate_plans(
         None, "--model",
         help="Claude model to use",
     ),
+    idle_timeout: int = typer.Option(
+        60, "--timeout", "-t",
+        help="Seconds to wait for Claude response",
+    ),
     dry_run: bool = typer.Option(
         False, "--dry-run",
         help="Show prompt without generating",
@@ -839,6 +850,7 @@ def generate_plans(
     # Create generator
     generator = PlansGenerator(
         model=model,
+        idle_timeout=idle_timeout,
         working_dir=working_dir,
     )
 
@@ -849,7 +861,9 @@ def generate_plans(
             ui.print_error(f"PRD file not found: {from_prd}")
             raise typer.Exit(1)
 
-        ui.console.print("\n[bold]Converting PRD to plans...[/bold]\n")
+        print(f"\n{'='*60}")
+        print("  Converting PRD to plans")
+        print(f"{'='*60}\n")
 
         result = generator.generate_from_prd(
             prd_path=str(prd_path),
@@ -882,7 +896,9 @@ def generate_plans(
             ui.console.print(generator.dry_run(context))
             raise typer.Exit(0)
 
-        ui.console.print("\n[bold]Generating phased plans...[/bold]\n")
+        print(f"\n{'='*60}")
+        print("  Generating phased plans")
+        print(f"{'='*60}\n")
         result = generator.generate(context)
 
     if result.success:

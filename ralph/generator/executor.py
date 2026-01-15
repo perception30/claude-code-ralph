@@ -1,9 +1,11 @@
 """Execute Claude for generation tasks."""
 
 import re
-import subprocess
+import sys
 from dataclasses import dataclass
 from typing import Callable, Optional
+
+import pexpect  # type: ignore[import-untyped]
 
 
 @dataclass
@@ -11,9 +13,11 @@ class GenerationExecutionConfig:
     """Configuration for generation execution."""
     model: Optional[str] = None
     timeout: int = 300  # 5 minutes default
+    idle_timeout: int = 60  # Idle timeout for interactive mode
     max_retries: int = 2
     working_dir: str = "."
     skip_permissions: bool = True
+    interactive: bool = True  # Stream output to terminal
     on_output: Optional[Callable[[str], None]] = None
 
 
@@ -22,6 +26,8 @@ class GeneratorExecutor:
 
     def __init__(self, config: Optional[GenerationExecutionConfig] = None):
         self.config = config or GenerationExecutionConfig()
+        self.process: Optional[pexpect.spawn] = None
+        self._output_buffer: list[str] = []
 
     def execute(self, prompt: str) -> tuple[bool, str]:
         """
@@ -33,6 +39,96 @@ class GeneratorExecutor:
         Returns:
             Tuple of (success, output_content)
         """
+        if self.config.interactive:
+            return self._execute_interactive(prompt)
+        else:
+            return self._execute_batch(prompt)
+
+    def _execute_interactive(self, prompt: str) -> tuple[bool, str]:
+        """Execute Claude interactively with real-time output streaming."""
+        args = []
+
+        if self.config.skip_permissions:
+            args.append("--dangerously-skip-permissions")
+
+        if self.config.model:
+            args.extend(["--model", self.config.model])
+
+        args.append(prompt)
+
+        self._output_buffer = []
+
+        try:
+            # Spawn claude - output goes directly to terminal
+            self.process = pexpect.spawn(
+                "claude",
+                args,
+                cwd=self.config.working_dir,
+                timeout=self.config.idle_timeout,
+                encoding='utf-8',
+                codec_errors='ignore',
+            )
+
+            # Stream output directly to stdout
+            self.process.logfile_read = sys.stdout
+
+            # Keep waiting while there's output
+            while True:
+                try:
+                    self.process.expect(r'.+', timeout=self.config.idle_timeout)
+
+                    # Capture output for later processing
+                    if self.process.after:
+                        self._output_buffer.append(self.process.after)
+
+                except pexpect.TIMEOUT:
+                    # No output for idle_timeout - Claude is idle/done
+                    break
+                except pexpect.EOF:
+                    # Process ended
+                    break
+
+            # Gracefully exit if still running
+            if self.process.isalive():
+                self.process.sendline("/exit")
+                try:
+                    self.process.expect(pexpect.EOF, timeout=10)
+                except pexpect.TIMEOUT:
+                    self.process.terminate(force=True)
+
+            # Collect all output
+            output = "".join(self._output_buffer)
+
+            # Also get any remaining buffer content
+            if self.process.before:
+                before = self.process.before
+                if isinstance(before, bytes):
+                    output += before.decode('utf-8', errors='ignore')
+                elif isinstance(before, str):
+                    output += before
+
+            return (True, output)
+
+        except pexpect.exceptions.ExceptionPexpect as e:
+            return (False, f"Claude execution failed: {e}")
+        except FileNotFoundError:
+            return (False, "Claude CLI not found. Please install it first.")
+        except Exception as e:
+            return (False, f"Execution failed: {e}")
+
+        finally:
+            if self.process:
+                try:
+                    if self.process.isalive():
+                        self.process.terminate(force=True)
+                except OSError:
+                    pass
+                self.process = None
+
+    def _execute_batch(self, prompt: str) -> tuple[bool, str]:
+        """Execute Claude in batch mode (non-interactive)."""
+        import subprocess
+
         args = ["claude", "--print"]
 
         if self.config.skip_permissions:
@@ -84,6 +180,11 @@ class GeneratorExecutor:
         all_errors: list[str] = []
 
         for attempt in range(self.config.max_retries + 1):
+            if attempt > 0:
+                print(f"\n{'='*60}")
+                print(f"  Retry attempt {attempt + 1}")
+                print(f"{'='*60}\n")
+
             success, output = self.execute(prompt)
 
             if not success:
@@ -203,11 +304,21 @@ Please fix these issues and regenerate."""
 
         return files
 
+    def interrupt(self) -> None:
+        """Interrupt the current execution."""
+        if self.process:
+            try:
+                self.process.terminate(force=True)
+            except OSError:
+                pass
+
 
 def create_executor(
     model: Optional[str] = None,
     timeout: int = 300,
+    idle_timeout: int = 60,
     working_dir: str = ".",
+    interactive: bool = True,
 ) -> GeneratorExecutor:
     """
     Factory function to create a GeneratorExecutor.
@@ -215,7 +326,9 @@ def create_executor(
     Args:
         model: Optional Claude model to use
         timeout: Execution timeout in seconds
+        idle_timeout: Idle timeout for interactive mode
         working_dir: Working directory for execution
+        interactive: Whether to stream output interactively
 
     Returns:
         Configured GeneratorExecutor
@@ -223,6 +336,8 @@ def create_executor(
     config = GenerationExecutionConfig(
         model=model,
         timeout=timeout,
+        idle_timeout=idle_timeout,
         working_dir=working_dir,
+        interactive=interactive,
     )
     return GeneratorExecutor(config)
