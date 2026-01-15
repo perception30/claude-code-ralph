@@ -82,11 +82,10 @@ class GeneratorExecutor:
                 self._stop_interaction = True
                 # Send EOF to terminate interact() - this is the cleanest way
                 if self.process and self.process.isalive():
-                    # Send /exit then Enter twice (first confirms autocomplete, second executes)
+                    # Write directly to PTY - \r is Enter key in raw terminal mode
                     try:
-                        self.process.sendline("/exit")
-                        time.sleep(0.1)
-                        self.process.sendline("")  # Extra Enter to execute
+                        import os as _os
+                        _os.write(self.process.child_fd, b"/exit\r")
                     except OSError:
                         pass
                 break
@@ -181,10 +180,11 @@ class GeneratorExecutor:
 
             # Clean up process
             if self.process and self.process.isalive():
-                # Send /exit then Enter twice (first confirms autocomplete, second executes)
-                self.process.sendline("/exit")
-                time.sleep(0.1)
-                self.process.sendline("")  # Extra Enter to execute
+                # Write directly to PTY - \r is Enter key in raw terminal mode
+                try:
+                    os.write(self.process.child_fd, b"/exit\r")
+                except OSError:
+                    pass
                 try:
                     self.process.expect(pexpect.EOF, timeout=10)
                 except (pexpect.TIMEOUT, pexpect.EOF):
