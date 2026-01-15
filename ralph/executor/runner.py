@@ -61,8 +61,10 @@ class ClaudeRunner:
                     self._stop_interaction = True
                     if self.process and self.process.isalive():
                         try:
-                            # Use \r (carriage return) instead of \n - terminals expect CR to execute commands
-                            self.process.send("/exit\r")
+                            # Send Escape to dismiss any autocomplete, then /exit with newline
+                            self.process.send("\x1b")  # Escape key
+                            time.sleep(0.1)
+                            self.process.sendline("/exit")
                         except OSError:
                             pass
                     break
@@ -163,8 +165,10 @@ class ClaudeRunner:
 
             # Clean up process
             if self.process and self.process.isalive():
-                # Use \r (carriage return) instead of \n - terminals expect CR to execute commands
-                self.process.send("/exit\r")
+                # Send Escape to dismiss any autocomplete, then /exit with newline
+                self.process.send("\x1b")  # Escape key
+                time.sleep(0.1)
+                self.process.sendline("/exit")
                 try:
                     self.process.expect(pexpect.EOF, timeout=10)
                 except (pexpect.TIMEOUT, pexpect.EOF):
