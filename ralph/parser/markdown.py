@@ -356,3 +356,80 @@ class MarkdownParser:
 
         merged.update_status()
         return merged
+
+    def validate_format(self, content: str) -> list[str]:
+        """
+        Validate markdown content format and return errors.
+
+        Args:
+            content: Markdown content to validate
+
+        Returns:
+            List of validation error messages (empty if valid)
+        """
+        errors: list[str] = []
+
+        # Check for project title
+        if not re.search(r'^#\s+.+$', content, re.MULTILINE):
+            errors.append("Missing project title (# heading)")
+
+        # Check for at least one phase
+        if not self.PHASE_PATTERN.search(content):
+            errors.append("No phase headers found (## headings)")
+
+        # Check for tasks
+        if not self.TASK_CHECKBOX_PATTERN.search(content):
+            # Also check PRD format
+            if not self.USER_STORY_PATTERN.search(content):
+                errors.append("No tasks found (checkbox items or user stories)")
+
+        # Validate task IDs if present
+        task_ids: list[str] = []
+        for match in self.TASK_CHECKBOX_PATTERN.finditer(content):
+            task_id = match.group(3)
+            if task_id:
+                if task_id in task_ids:
+                    errors.append(f"Duplicate task ID: {task_id}")
+                task_ids.append(task_id)
+
+        # Check for PRD-specific validation
+        if self._is_prd_format(content):
+            prd_errors = self._validate_prd_format(content)
+            errors.extend(prd_errors)
+
+        return errors
+
+    def _validate_prd_format(self, content: str) -> list[str]:
+        """Validate PRD-specific format requirements."""
+        errors: list[str] = []
+
+        # Check for User Stories section
+        if not re.search(r'^##\s+User\s+Stories', content, re.MULTILINE | re.IGNORECASE):
+            errors.append("PRD missing 'User Stories' section")
+
+        # Check user story format
+        story_ids: list[str] = []
+        for match in self.USER_STORY_PATTERN.finditer(content):
+            story_id = match.group(1)
+            if story_id:
+                if story_id in story_ids:
+                    errors.append(f"Duplicate user story ID: {story_id}")
+                story_ids.append(story_id)
+
+        return errors
+
+    def detect_format(self, content: str) -> str:
+        """
+        Detect the format of markdown content.
+
+        Args:
+            content: Markdown content
+
+        Returns:
+            Format string: 'prd', 'plans', or 'unknown'
+        """
+        if self._is_prd_format(content):
+            return 'prd'
+        if self.TASK_CHECKBOX_PATTERN.search(content):
+            return 'plans'
+        return 'unknown'

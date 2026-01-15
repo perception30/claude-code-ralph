@@ -12,6 +12,11 @@ from . import __version__
 from .config import RalphConfig, get_project_config_path
 from .executor.retry import RetryConfig
 from .executor.runner import RalphExecutor
+from .generator import (
+    GeneratorContext,
+    PlansGenerator,
+    PRDGenerator,
+)
 from .input.base import InputSource
 from .input.config import ConfigInput
 from .input.plans import PlansInput
@@ -661,6 +666,242 @@ def reset(
 
     store.reset()
     ui.console.print("[green]State reset![/green]")
+
+
+# Generate command group
+generate_app = typer.Typer(help="Generate PRDs and phased plans")
+app.add_typer(generate_app, name="generate")
+
+
+@generate_app.command("prd")
+def generate_prd(
+    prompt: Optional[str] = typer.Option(
+        None, "--prompt", "-p",
+        help="Prompt describing the feature/project",
+    ),
+    from_file: Optional[str] = typer.Option(
+        None, "--from-file", "-f",
+        help="Path to prompt file (.txt, .md)",
+    ),
+    output: str = typer.Option(
+        "./PRD.md", "--output", "-o",
+        help="Output file path",
+    ),
+    project_name: Optional[str] = typer.Option(
+        None, "--name", "-n",
+        help="Project name",
+    ),
+    model: Optional[str] = typer.Option(
+        None, "--model",
+        help="Claude model to use",
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run",
+        help="Show prompt without generating",
+    ),
+    working_dir: str = typer.Option(
+        ".", "--dir", "-d",
+        help="Working directory",
+    ),
+) -> None:
+    """
+    Generate a PRD (Product Requirements Document) from a prompt.
+
+    Examples:
+        ralph generate prd --prompt "User authentication system with OAuth"
+        ralph generate prd --from-file ./requirements.txt --output ./docs/PRD.md
+    """
+    working_dir = os.path.abspath(working_dir)
+
+    # Validate input
+    if not prompt and not from_file:
+        ui.print_error("Either --prompt or --from-file is required")
+        raise typer.Exit(1)
+
+    if prompt and from_file:
+        ui.print_error("Cannot use both --prompt and --from-file")
+        raise typer.Exit(1)
+
+    # Use prompt or file
+    input_prompt = prompt if prompt else from_file
+    assert input_prompt is not None  # Validated above
+
+    if from_file:
+        path = Path(from_file)
+        if not path.exists():
+            ui.print_error(f"File not found: {from_file}")
+            raise typer.Exit(1)
+
+    # Create context
+    context = GeneratorContext(
+        prompt=input_prompt,
+        output_path=output,
+        project_name=project_name,
+    )
+
+    # Create generator
+    generator = PRDGenerator(
+        model=model,
+        working_dir=working_dir,
+    )
+
+    # Dry run - show prompt only
+    if dry_run:
+        ui.console.print("\n[yellow]Dry run - generation prompt:[/yellow]\n")
+        ui.console.print(generator.dry_run(context))
+        raise typer.Exit(0)
+
+    # Generate
+    ui.console.print("\n[bold]Generating PRD...[/bold]\n")
+
+    result = generator.generate(context)
+
+    if result.success:
+        ui.console.print("[green]PRD generated successfully![/green]")
+        ui.console.print(f"Output: {result.output_path}")
+
+        if result.warnings:
+            ui.console.print("\n[yellow]Warnings:[/yellow]")
+            for warning in result.warnings:
+                ui.console.print(f"  - {warning}")
+    else:
+        ui.print_error("PRD generation failed")
+        for error in result.errors:
+            ui.console.print(f"  - {error}")
+        raise typer.Exit(1)
+
+
+@generate_app.command("plans")
+def generate_plans(
+    prompt: Optional[str] = typer.Option(
+        None, "--prompt", "-p",
+        help="Prompt describing the feature/project",
+    ),
+    from_file: Optional[str] = typer.Option(
+        None, "--from-file", "-f",
+        help="Path to prompt file (.txt, .md)",
+    ),
+    from_prd: Optional[str] = typer.Option(
+        None, "--from-prd",
+        help="Convert PRD file to plans",
+    ),
+    output: str = typer.Option(
+        "./plans", "--output", "-o",
+        help="Output directory path",
+    ),
+    project_name: Optional[str] = typer.Option(
+        None, "--name", "-n",
+        help="Project name",
+    ),
+    phases: Optional[int] = typer.Option(
+        None, "--phases",
+        help="Number of phases to generate (default: auto)",
+    ),
+    max_tasks: int = typer.Option(
+        10, "--max-tasks",
+        help="Maximum tasks per phase",
+    ),
+    model: Optional[str] = typer.Option(
+        None, "--model",
+        help="Claude model to use",
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run",
+        help="Show prompt without generating",
+    ),
+    working_dir: str = typer.Option(
+        ".", "--dir", "-d",
+        help="Working directory",
+    ),
+) -> None:
+    """
+    Generate phased implementation plans from a prompt.
+
+    Examples:
+        ralph generate plans --prompt "Refactor authentication system"
+        ralph generate plans --from-prd ./PRD.md --output ./plans/
+        ralph generate plans --from-file ./feature.md --phases 4
+    """
+    working_dir = os.path.abspath(working_dir)
+
+    # Validate input - need exactly one source
+    sources = [prompt, from_file, from_prd]
+    provided = sum(1 for s in sources if s)
+
+    if provided == 0:
+        ui.print_error("One of --prompt, --from-file, or --from-prd is required")
+        raise typer.Exit(1)
+
+    if provided > 1:
+        ui.print_error("Only one input source can be specified")
+        raise typer.Exit(1)
+
+    # Create generator
+    generator = PlansGenerator(
+        model=model,
+        working_dir=working_dir,
+    )
+
+    # Handle PRD conversion separately
+    if from_prd:
+        prd_path = Path(from_prd)
+        if not prd_path.exists():
+            ui.print_error(f"PRD file not found: {from_prd}")
+            raise typer.Exit(1)
+
+        ui.console.print("\n[bold]Converting PRD to plans...[/bold]\n")
+
+        result = generator.generate_from_prd(
+            prd_path=str(prd_path),
+            output_path=output,
+            num_phases=phases,
+        )
+    else:
+        # Use prompt or file
+        input_prompt = prompt if prompt else from_file
+        assert input_prompt is not None  # Validated above
+
+        if from_file:
+            path = Path(from_file)
+            if not path.exists():
+                ui.print_error(f"File not found: {from_file}")
+                raise typer.Exit(1)
+
+        # Create context
+        context = GeneratorContext(
+            prompt=input_prompt,
+            output_path=output,
+            project_name=project_name,
+            num_phases=phases,
+            max_tasks_per_phase=max_tasks,
+        )
+
+        # Dry run - show prompt only
+        if dry_run:
+            ui.console.print("\n[yellow]Dry run - generation prompt:[/yellow]\n")
+            ui.console.print(generator.dry_run(context))
+            raise typer.Exit(0)
+
+        ui.console.print("\n[bold]Generating phased plans...[/bold]\n")
+        result = generator.generate(context)
+
+    if result.success:
+        ui.console.print("[green]Plans generated successfully![/green]")
+        ui.console.print(f"Output directory: {result.output_path}")
+        ui.console.print(f"Files created: {len(result.files)}")
+
+        for filename in sorted(result.files.keys()):
+            ui.console.print(f"  - {filename}")
+
+        if result.warnings:
+            ui.console.print("\n[yellow]Warnings:[/yellow]")
+            for warning in result.warnings:
+                ui.console.print(f"  - {warning}")
+    else:
+        ui.print_error("Plans generation failed")
+        for error in result.errors:
+            ui.console.print(f"  - {error}")
+        raise typer.Exit(1)
 
 
 def _show_task_list(project, status_filter: Optional[TaskStatus] = None) -> None:
