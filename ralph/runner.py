@@ -152,7 +152,7 @@ class RalphSession:
 
     def _setup_signal_handlers(self) -> None:
         """Set up signal handlers for graceful shutdown."""
-        def handler(signum, frame):
+        def handler(_signum, _frame):
             self._interrupted = True
             if self.runner:
                 self.runner.interrupt()

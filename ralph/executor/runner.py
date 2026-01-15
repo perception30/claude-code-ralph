@@ -68,10 +68,15 @@ class ClaudeRunner:
             self.process.logfile_read = sys.stdout.buffer
 
             # Keep waiting while there's output (like expect's exp_continue)
-            # Exit when idle (no output for idle_timeout seconds)
+            # Check status file after each chunk - exit immediately when written
             while True:
                 try:
                     self.process.expect(r'.+', timeout=self.idle_timeout)
+
+                    # Check if Claude wrote the status file
+                    if status_file.exists():
+                        break
+
                 except pexpect.TIMEOUT:
                     # No output for idle_timeout - Claude is idle
                     break
@@ -318,7 +323,7 @@ class RalphExecutor:
 
     def _setup_signal_handlers(self) -> None:
         """Set up signal handlers."""
-        def handler(signum, frame):
+        def handler(_signum, _frame):
             self._interrupted = True
             if self._current_runner:
                 self._current_runner.interrupt()
