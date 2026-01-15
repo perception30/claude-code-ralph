@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from .models import Project, Phase, Task, TaskStatus, Iteration
+from .models import Iteration, Phase, Project, Task, TaskStatus
 
 
 class StateStore:
@@ -42,7 +42,7 @@ class StateStore:
             return None
 
         try:
-            with open(self.state_file, 'r') as f:
+            with open(self.state_file) as f:
                 data = json.load(f)
             self._project = Project.from_dict(data)
             return self._project
@@ -227,7 +227,7 @@ class StateStore:
         backup_name = f"state_backup_{timestamp}{suffix}.json"
         backup_path = self.state_dir / backup_name
 
-        with open(self.state_file, 'r') as src:
+        with open(self.state_file) as src:
             with open(backup_path, 'w') as dst:
                 dst.write(src.read())
 
@@ -244,7 +244,7 @@ class StateStore:
         if not backup_path.exists():
             raise FileNotFoundError(f"Backup file not found: {backup_path}")
 
-        with open(backup_path, 'r') as f:
+        with open(backup_path) as f:
             data = json.load(f)
 
         self._project = Project.from_dict(data)

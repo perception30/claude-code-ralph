@@ -1,7 +1,7 @@
 """Configuration management for Ralph CLI."""
 
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -30,11 +30,12 @@ class RalphConfig:
 1. Read the phased plans in {plans_dir}/*.md
 2. Carefully check their implementation status so far.
 3. Pick the **highest priority** phase from the phased plans which is not yet completed.
-4. Implement that single phase step by step very carefully end to end. Read all relevant code paths and modules and deep analyze to gather a complete understanding and context of the task/story before diving into implementation.
+4. Implement that single phase step by step very carefully end to end.
+   Read all relevant code paths and modules to understand the task/story fully.
 5. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
 6. Update CLAUDE.md files if you discover reusable patterns
 7. If checks pass, commit ALL changes with message: feat: [Story ID] - [Story Title]
-8. Carefully mark the implementation status in the phased plan so future iterations know what to work on next.
+8. Mark the implementation status in the phased plan for future iterations.
 
 ## End Condition
 

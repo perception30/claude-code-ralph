@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from .base import InputSource, InputResult
 from ..parser.markdown import MarkdownParser
+from .base import InputResult, InputSource
 
 
 @dataclass

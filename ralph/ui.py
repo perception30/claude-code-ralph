@@ -3,13 +3,12 @@
 from datetime import datetime, timedelta
 from typing import Optional
 
+from rich.box import DOUBLE, HEAVY, ROUNDED
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 from rich.text import Text
-from rich.box import ROUNDED, DOUBLE, HEAVY
-
 
 console = Console()
 
@@ -75,10 +74,9 @@ class RalphUI:
     def print_iteration_complete(self, iteration: int, duration: timedelta) -> None:
         """Print iteration completion message."""
         self.console.print()
-        self.console.print(
-            f"  [green]✓[/green] Iteration {iteration} completed in {self._format_duration(duration)}",
-            style="dim"
-        )
+        duration_str = self._format_duration(duration)
+        msg = f"  [green]✓[/green] Iteration {iteration} completed in {duration_str}"
+        self.console.print(msg, style="dim")
 
     def print_waiting(self) -> None:
         """Print waiting message."""

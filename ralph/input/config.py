@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from .base import InputSource, InputResult
+from .base import InputResult, InputSource
 from .plans import PlansInput
 from .prd import PRDInput
 
@@ -79,7 +79,9 @@ class RalphProjectConfig:
         claude_cfg = data.get("claude", {})
         config.model = claude_cfg.get("model", config.model)
         config.skip_permissions = claude_cfg.get("skip_permissions", config.skip_permissions)
-        config.custom_instructions = claude_cfg.get("custom_instructions", config.custom_instructions)
+        config.custom_instructions = claude_cfg.get(
+            "custom_instructions", config.custom_instructions
+        )
 
         # Output settings
         output_cfg = data.get("output", {})
@@ -163,7 +165,7 @@ class ConfigInput(InputSource):
             return result
 
         try:
-            with open(path, 'r') as f:
+            with open(path) as f:
                 data = json.load(f)
 
             self.config = RalphProjectConfig.from_dict(data)
@@ -225,7 +227,7 @@ class ConfigInput(InputSource):
             return errors
 
         try:
-            with open(path, 'r') as f:
+            with open(path) as f:
                 data = json.load(f)
 
             # Validate required fields

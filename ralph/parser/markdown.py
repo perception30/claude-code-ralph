@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from ..state.models import Project, Phase, Task, TaskStatus
+from ..state.models import Phase, Project, Task, TaskStatus
 
 
 class MarkdownParser:
@@ -188,7 +188,8 @@ class MarkdownParser:
             # Check for task metadata (under current task)
             if current_task:
                 # Priority
-                priority_match = re.match(r'^\s*-?\s*Priority:\s*(\d+|high|medium|low)$', line, re.IGNORECASE)
+                priority_pattern = r'^\s*-?\s*Priority:\s*(\d+|high|medium|low)$'
+                priority_match = re.match(priority_pattern, line, re.IGNORECASE)
                 if priority_match:
                     priority_val = priority_match.group(1).lower()
                     if priority_val == 'high':
@@ -280,14 +281,19 @@ class MarkdownParser:
                 continue
 
             # Check for status in PRD format
-            status_match = re.match(r'^\*\*Status:\*\*\s*(Pending|In Progress|Completed|Blocked|Failed)', line, re.IGNORECASE)
+            status_pattern = (
+                r'^\*\*Status:\*\*\s*'
+                r'(Pending|In Progress|Completed|Blocked|Failed)'
+            )
+            status_match = re.match(status_pattern, line, re.IGNORECASE)
             if status_match and current_task:
                 status_str = status_match.group(1).lower().replace(' ', '_')
                 current_task.status = TaskStatus(status_str)
                 continue
 
             # Check for priority in PRD format
-            priority_match = re.match(r'^\*\*Priority:\*\*\s*(High|Medium|Low|\d+)', line, re.IGNORECASE)
+            prd_priority_pattern = r'^\*\*Priority:\*\*\s*(High|Medium|Low|\d+)'
+            priority_match = re.match(prd_priority_pattern, line, re.IGNORECASE)
             if priority_match and current_task:
                 priority_val = priority_match.group(1).lower()
                 if priority_val == 'high':

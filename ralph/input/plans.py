@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from .base import InputSource, InputResult
 from ..parser.markdown import MarkdownParser
+from .base import InputResult, InputSource
 
 
 @dataclass
@@ -31,7 +31,8 @@ class PlansInput(InputSource):
 
         md_files = sorted(path.glob(self.pattern))
         if not md_files:
-            result.errors.append(f"No plan files matching '{self.pattern}' found in: {self.plans_dir}")
+            msg = f"No plan files matching '{self.pattern}' found in: {self.plans_dir}"
+            result.errors.append(msg)
             return result
 
         result.source_files = [str(f) for f in md_files]

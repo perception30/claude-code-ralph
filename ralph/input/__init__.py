@@ -1,10 +1,10 @@
 """Input handlers for Ralph CLI."""
 
-from .base import InputSource, InputResult
-from .prompt import PromptInput
+from .base import InputResult, InputSource
+from .config import ConfigInput
 from .plans import PlansInput
 from .prd import PRDInput
-from .config import ConfigInput
+from .prompt import PromptInput
 
 __all__ = [
     "InputSource",

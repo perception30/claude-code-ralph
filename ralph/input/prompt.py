@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass
 
-from .base import InputSource, InputResult
-from ..state.models import Project, Phase, Task
+from ..state.models import Phase, Project, Task
+from .base import InputResult, InputSource
 
 
 @dataclass

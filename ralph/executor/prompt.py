@@ -22,7 +22,9 @@ class PromptBuilder:
     """Builds optimized prompts for Claude execution."""
 
     # The core autonomous agent prompt - optimized for efficiency and clarity
-    AUTONOMOUS_PROMPT_TEMPLATE = '''You are Ralph, an autonomous software engineering agent executing iteration {iteration}.
+    AUTONOMOUS_PROMPT_TEMPLATE = (
+        '''You are Ralph, an autonomous software engineering agent '''
+        '''executing iteration {iteration}.
 
 ## PROJECT STATUS
 {progress_summary}
@@ -57,6 +59,7 @@ If ALL project tasks are done:
 ```
 {custom_section}
 Now implement the task. Be thorough but efficient.'''
+    )
 
     # Simplified prompt for single tasks/prompts
     SIMPLE_PROMPT_TEMPLATE = '''You are Ralph, an autonomous software engineering agent.
@@ -137,17 +140,21 @@ Now implement the task.'''
         """Format project progress summary."""
         lines = [
             f"Project: {project.name}",
-            f"Progress: {project.completed_tasks}/{project.total_tasks} tasks ({round(project.progress * 100, 1)}%)",
+            f"Progress: {project.completed_tasks}/{project.total_tasks} tasks "
+            f"({round(project.progress * 100, 1)}%)",
             "",
             "Phases:",
         ]
 
         for phase in project.phases:
             status_icon = self._get_status_icon(phase.status)
-            current = " ← current" if phase.status in (TaskStatus.PENDING, TaskStatus.IN_PROGRESS) and not phase.is_complete else ""
-            lines.append(
-                f"  {status_icon} {phase.name}: {phase.completed_count}/{len(phase.tasks)} tasks{current}"
+            is_current = (
+                phase.status in (TaskStatus.PENDING, TaskStatus.IN_PROGRESS)
+                and not phase.is_complete
             )
+            current = " ← current" if is_current else ""
+            task_count = f"{phase.completed_count}/{len(phase.tasks)}"
+            lines.append(f"  {status_icon} {phase.name}: {task_count} tasks{current}")
 
         return "\n".join(lines)
 

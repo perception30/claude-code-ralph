@@ -1,9 +1,9 @@
 """Progress tracking for Ralph CLI."""
 
 from datetime import datetime
-from typing import Optional, Callable
+from typing import Callable, Optional
 
-from .models import Project, Phase, Task, TaskStatus, Iteration
+from .models import Iteration, Phase, Project, Task, TaskStatus
 from .store import StateStore
 
 
@@ -138,7 +138,10 @@ class ProgressTracker:
             "total_tasks": self.project.total_tasks,
             "completed_tasks": self.project.completed_tasks,
             "progress_percent": round(self.project.progress * 100, 1),
-            "current_iteration": self._current_iteration.number if self._current_iteration else self.project.current_iteration,
+            "current_iteration": (
+                self._current_iteration.number
+                if self._current_iteration else self.project.current_iteration
+            ),
             "total_phases": len(self.project.phases),
             "current_phase": {
                 "id": current_phase.id,
@@ -252,9 +255,10 @@ class ProgressTracker:
         if progress["status"] == "no_project":
             return "No project loaded"
 
-        parts = [
-            f"Progress: {progress['completed_tasks']}/{progress['total_tasks']} tasks ({progress['progress_percent']}%)"
-        ]
+        completed = progress['completed_tasks']
+        total = progress['total_tasks']
+        pct = progress['progress_percent']
+        parts = [f"Progress: {completed}/{total} tasks ({pct}%)"]
 
         if progress.get("current_phase"):
             parts.append(f"Phase: {progress['current_phase']['name']}")

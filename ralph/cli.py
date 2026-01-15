@@ -2,25 +2,25 @@
 
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional
 
 import typer
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
 from . import __version__
 from .config import RalphConfig, get_project_config_path
-from .state.store import StateStore
-from .state.tracker import ProgressTracker
-from .state.models import TaskStatus
+from .executor.retry import RetryConfig
+from .executor.runner import RalphExecutor
 from .input.base import InputSource
-from .input.prompt import PromptInput
+from .input.config import ConfigInput
 from .input.plans import PlansInput
 from .input.prd import PRDInput
-from .input.config import ConfigInput
+from .input.prompt import PromptInput
 from .parser.markdown import MarkdownParser
-from .executor.runner import RalphExecutor
-from .executor.retry import RetryConfig
+from .state.models import TaskStatus
+from .state.store import StateStore
+from .state.tracker import ProgressTracker
 from .ui import ui
 
 app = typer.Typer(
@@ -53,7 +53,7 @@ def run(
         None, "--plans",
         help="Directory containing plan files",
     ),
-    files: Optional[List[str]] = typer.Option(
+    files: Optional[list[str]] = typer.Option(
         None, "--files", "-f",
         help="Specific plan files to parse",
     ),
@@ -269,7 +269,9 @@ def run(
         # Show project summary
         if project:
             ui.console.print(f"\n[bold]Project:[/bold] {project.name}")
-            ui.console.print(f"[bold]Tasks:[/bold] {project.total_tasks} total, {project.completed_tasks} completed")
+            total = project.total_tasks
+            completed = project.completed_tasks
+            ui.console.print(f"[bold]Tasks:[/bold] {total} total, {completed} completed")
             ui.console.print(f"[bold]Phases:[/bold] {len(project.phases)}")
 
     # Dry run - just show what would be done
@@ -427,7 +429,10 @@ def status(
 
     status_table.add_row("Project", project.name)
     status_table.add_row("Status", progress["status"].upper())
-    status_table.add_row("Progress", f"{progress['completed_tasks']}/{progress['total_tasks']} tasks ({progress['progress_percent']}%)")
+    completed = progress['completed_tasks']
+    total = progress['total_tasks']
+    pct = progress['progress_percent']
+    status_table.add_row("Progress", f"{completed}/{total} tasks ({pct}%)")
     status_table.add_row("Iterations", str(progress["current_iteration"]))
 
     ui.console.print(Panel(status_table, title="[bold]Ralph Status[/bold]"))
@@ -435,8 +440,16 @@ def status(
     # Phase summary
     ui.console.print("\n[bold]Phases:[/bold]")
     for phase in tracker.get_phases_summary():
-        icon = "✓" if phase["status"] == "completed" else "→" if phase["status"] == "in_progress" else "○"
-        ui.console.print(f"  {icon} {phase['name']}: {phase['tasks_completed']}/{phase['tasks_total']}")
+        status = phase["status"]
+        if status == "completed":
+            icon = "✓"
+        elif status == "in_progress":
+            icon = "→"
+        else:
+            icon = "○"
+        done = phase['tasks_completed']
+        total_tasks = phase['tasks_total']
+        ui.console.print(f"  {icon} {phase['name']}: {done}/{total_tasks}")
 
     if detailed:
         _show_task_list(project)
@@ -473,7 +486,9 @@ def resume(
 
     ui.print_banner()
     ui.console.print(f"[bold]Resuming:[/bold] {project.name}")
-    ui.console.print(f"[bold]Progress:[/bold] {project.completed_tasks}/{project.total_tasks} tasks")
+    done = project.completed_tasks
+    total = project.total_tasks
+    ui.console.print(f"[bold]Progress:[/bold] {done}/{total} tasks")
 
     # Run executor
     executor = RalphExecutor(
@@ -527,7 +542,13 @@ def history(
     table.add_column("Tasks Completed")
 
     for it in tracker.get_iteration_history(limit):
-        status_style = "green" if it["status"] == "success" else "red" if it["status"] == "failed" else "yellow"
+        it_status = it["status"]
+        if it_status == "success":
+            status_style = "green"
+        elif it_status == "failed":
+            status_style = "red"
+        else:
+            status_style = "yellow"
         duration = f"{it['duration_seconds']:.1f}s" if it["duration_seconds"] else "-"
         table.add_row(
             str(it["number"]),

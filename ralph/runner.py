@@ -5,6 +5,7 @@ import signal
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
+
 import pexpect  # type: ignore[import-untyped]
 
 from .config import RalphConfig

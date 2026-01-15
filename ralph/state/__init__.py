@@ -1,6 +1,6 @@
 """State management for Ralph CLI."""
 
-from .models import TaskStatus, Task, Phase, Project
+from .models import Phase, Project, Task, TaskStatus
 from .store import StateStore
 from .tracker import ProgressTracker
 

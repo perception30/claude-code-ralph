@@ -7,15 +7,16 @@ import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
+
 import pexpect  # type: ignore[import-untyped]
 
-from .prompt import PromptBuilder, ExecutionContext
-from .output import OutputParser, ParsedOutput
-from .retry import RetryConfig
+from ..parser.checkbox import CheckboxUpdater
 from ..state.models import Project
 from ..state.store import StateStore
 from ..state.tracker import ProgressTracker
-from ..parser.checkbox import CheckboxUpdater
+from .output import OutputParser, ParsedOutput
+from .prompt import ExecutionContext, PromptBuilder
+from .retry import RetryConfig
 
 
 class ClaudeRunner:
@@ -88,13 +89,17 @@ class ClaudeRunner:
                 self.process.sendline("/exit")
                 try:
                     self.process.expect(pexpect.EOF, timeout=10)
-                except:
+                except pexpect.TIMEOUT:
                     self.process.terminate(force=True)
 
             # Get output for parsing
             output = ""
             if self.process.before:
-                output = self.process.before.decode('utf-8', errors='ignore') if isinstance(self.process.before, bytes) else self.process.before
+                before = self.process.before
+                if isinstance(before, bytes):
+                    output = before.decode('utf-8', errors='ignore')
+                else:
+                    output = before
 
             # Read status from file (Claude writes here when done)
             parsed = self._read_status_file(status_file, output)
@@ -108,7 +113,7 @@ class ClaudeRunner:
                 try:
                     if self.process.isalive():
                         self.process.terminate(force=True)
-                except:
+                except OSError:
                     pass
                 self.process = None
 
@@ -145,7 +150,7 @@ class ClaudeRunner:
                 elif status == "PROJECT_COMPLETE":
                     parsed.project_complete = True
 
-            except (json.JSONDecodeError, IOError):
+            except (OSError, json.JSONDecodeError):
                 pass
 
         # Fallback: also check output for markers
@@ -160,7 +165,7 @@ class ClaudeRunner:
         if self.process:
             try:
                 self.process.terminate(force=True)
-            except:
+            except OSError:
                 pass
 
 

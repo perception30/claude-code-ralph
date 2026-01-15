@@ -68,8 +68,14 @@ class Task:
             priority=data.get("priority", 0),
             dependencies=data.get("dependencies", []),
             phase_id=data.get("phase_id"),
-            started_at=datetime.fromisoformat(data["started_at"]) if data.get("started_at") else None,
-            completed_at=datetime.fromisoformat(data["completed_at"]) if data.get("completed_at") else None,
+            started_at=(
+                datetime.fromisoformat(data["started_at"])
+                if data.get("started_at") else None
+            ),
+            completed_at=(
+                datetime.fromisoformat(data["completed_at"])
+                if data.get("completed_at") else None
+            ),
             iteration=data.get("iteration"),
             attempts=data.get("attempts", 0),
             error=data.get("error"),
@@ -303,8 +309,14 @@ class Project:
             version=data.get("version", "1.0"),
             description=data.get("description", ""),
             status=TaskStatus(data.get("status", "pending")),
-            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(),
-            updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(),
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if data.get("created_at") else datetime.now()
+            ),
+            updated_at=(
+                datetime.fromisoformat(data["updated_at"])
+                if data.get("updated_at") else datetime.now()
+            ),
             source_files=data.get("source_files", []),
         )
         project.phases = [Phase.from_dict(p) for p in data.get("phases", [])]
