@@ -43,12 +43,14 @@ class ClaudeRunner:
         self._interrupted = False
         self._stop_interaction = False
         self._captured_output = io.StringIO()
+        self._last_output_time: Optional[float] = None
 
     def _monitor_status_file(self, status_file: Path) -> None:
         """Background thread to monitor status file and signal completion."""
         status_detected = False
         post_status_start = None
-        max_post_status_wait = 10  # Max wait after status detected
+        max_post_status_wait = 30  # Max wait after status detected (fallback)
+        idle_threshold = 3  # Exit after 3 seconds of no output
 
         while not self._stop_interaction:
             if status_file.exists() and self._is_our_status_file(status_file):
@@ -56,23 +58,41 @@ class ClaudeRunner:
                     status_detected = True
                     post_status_start = time.time()
 
-                # Wait a bit for Claude to finish its output after writing status
-                if post_status_start and time.time() - post_status_start > max_post_status_wait:
-                    self._stop_interaction = True
-                    if self.process and self.process.isalive():
-                        try:
-                            # Send SIGTERM to gracefully terminate Claude CLI
-                            os.kill(self.process.pid, signal.SIGTERM)
-                        except (OSError, ProcessLookupError):
-                            pass
-                    break
-            time.sleep(1)
+                # Check if we should exit based on idle time or max wait
+                if post_status_start:
+                    elapsed = time.time() - post_status_start
+
+                    # Primary: Exit after idle period (no output for idle_threshold seconds)
+                    if self._last_output_time:
+                        idle_time = time.time() - self._last_output_time
+                        if idle_time > idle_threshold:
+                            self._stop_interaction = True
+                            if self.process and self.process.isalive():
+                                try:
+                                    # Send SIGTERM to gracefully terminate Claude CLI
+                                    os.kill(self.process.pid, signal.SIGTERM)
+                                except (OSError, ProcessLookupError):
+                                    pass
+                            break
+
+                    # Fallback: Exit after max wait regardless of output
+                    if elapsed > max_post_status_wait:
+                        self._stop_interaction = True
+                        if self.process and self.process.isalive():
+                            try:
+                                os.kill(self.process.pid, signal.SIGTERM)
+                            except (OSError, ProcessLookupError):
+                                pass
+                        break
+            time.sleep(0.5)  # Check more frequently
 
     def _output_filter(self, data: bytes) -> bytes:
         """Filter to capture output while passing it through."""
         try:
             text = data.decode('utf-8', errors='ignore')
             self._captured_output.write(text)
+            # Track last output time for idle detection
+            self._last_output_time = time.time()
         except Exception:
             pass
         return data
@@ -86,6 +106,7 @@ class ClaudeRunner:
         self._interrupted = False
         self._stop_interaction = False
         self._captured_output = io.StringIO()
+        self._last_output_time = None
         status_file = Path(self.working_dir) / ".ralph" / "status.json"
 
         # Clear status file before run

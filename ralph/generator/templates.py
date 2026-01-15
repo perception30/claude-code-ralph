@@ -43,7 +43,23 @@ Create a PRD using the phased plan format for direct executability:
 6. When done, write status to `.ralph/status.json`:
    {{"status": "COMPLETED", "task_id": "generate-prd"}}
 
-Tasks should not be very granular, otherwise it will require too many iterations to complete.
+## CRITICAL: TASK GRANULARITY
+Tasks MUST be LARGE and COARSE-GRAINED. Each task should represent a substantial unit of work:
+- **Minimum scope**: Each task should take 2-8 hours of focused work
+- **Maximum tasks per phase**: 3-5 tasks (NOT 8-10)
+- **Maximum total tasks**: 10-20 for the entire PRD (NOT 50-60)
+- **Group related work**: Combine related sub-tasks into single larger tasks
+- **One iteration per task**: Each task will be one Claude iteration, so make them comprehensive
+
+BAD (too granular):
+- TASK-101: Install Inter font
+- TASK-102: Configure font weights
+- TASK-103: Set up CSS variable
+- TASK-104: Add fallback fonts
+
+GOOD (properly sized):
+- TASK-101: Set up complete typography foundation (font installation, weights, CSS variables, fallbacks)
+
 Before creating the PRD, review all the relevant code paths/modules and deep analyze to gather context and understand the scope of the request. Ask users for clarifications if there are any gaps in understanding, or ambiguous requirements.
 
 Then, create the PRD files.
@@ -80,8 +96,24 @@ Write plan files to: {output_path}
 5. When done, write status to `.ralph/status.json`:
    {{"status": "COMPLETED", "task_id": "generate-plans"}}
 
+## CRITICAL: TASK GRANULARITY
+Tasks MUST be LARGE and COARSE-GRAINED. Each task should represent a substantial unit of work:
+- **Minimum scope**: Each task should take 2-8 hours of focused work
+- **Maximum tasks per phase**: 3-5 tasks (NOT 8-10)
+- **Maximum total tasks**: 10-20 for the entire plan (NOT 50-60)
+- **Group related work**: Combine related sub-tasks into single larger tasks
+- **One iteration per task**: Each task will be one Claude iteration, so make them comprehensive
+
+BAD (too granular):
+- TASK-101: Create Button component
+- TASK-102: Add Button variants
+- TASK-103: Add Button sizes
+- TASK-104: Add Button tests
+
+GOOD (properly sized):
+- TASK-101: Implement complete Button component with all variants, sizes, states, and tests
+
 Before creating the phased plan files, review all the relevant code paths/modules and deep analyze to gather context and understand the scope of the request. Ask users for clarifications if there are any gaps in understanding, or ambiguous requirements.
-Tasks should not be very granular, otherwise it will require too many iterations to complete.
 
 Then, proceed to create the phased plan files.
 '''
@@ -130,6 +162,16 @@ Analyze the PRD and create/refine phased execution plans:
 
 6. When done, write status to `.ralph/status.json`:
    {{"status": "COMPLETED", "task_id": "generate-plans"}}
+
+## CRITICAL: TASK GRANULARITY
+Tasks MUST be LARGE and COARSE-GRAINED. Each task should represent a substantial unit of work:
+- **Minimum scope**: Each task should take 2-8 hours of focused work
+- **Maximum tasks per phase**: 3-5 tasks (NOT 8-10)
+- **Maximum total tasks**: 10-20 for the entire plan (NOT 50-60)
+- **Group related work**: Combine related sub-tasks into single larger tasks
+- **One iteration per task**: Each task will be one Claude iteration, so make them comprehensive
+
+When refining, CONSOLIDATE granular tasks into larger ones rather than keeping them separate.
 
 Now create the plan files.
 '''
