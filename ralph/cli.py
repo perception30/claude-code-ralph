@@ -752,8 +752,8 @@ def generate_prd(
         help="Path to prompt file (.txt, .md)",
     ),
     output: str = typer.Option(
-        "./PRD.md", "--output", "-o",
-        help="Output file path",
+        "./PRDs", "--output", "-o",
+        help="Output directory path",
     ),
     project_name: Optional[str] = typer.Option(
         None, "--name", "-n",

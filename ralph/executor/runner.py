@@ -1,9 +1,12 @@
 """Simple Claude runner - spawn and let it run."""
 
+import io
 import json
 import os
 import signal
 import sys
+import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, Optional
@@ -38,13 +41,50 @@ class ClaudeRunner:
         self.expected_task_id = expected_task_id
         self.process: Optional[pexpect.spawn] = None
         self._interrupted = False
+        self._stop_interaction = False
+        self._captured_output = io.StringIO()
+
+    def _monitor_status_file(self, status_file: Path) -> None:
+        """Background thread to monitor status file and signal completion."""
+        status_detected = False
+        post_status_start = None
+        max_post_status_wait = 10  # Max wait after status detected
+
+        while not self._stop_interaction:
+            if status_file.exists() and self._is_our_status_file(status_file):
+                if not status_detected:
+                    status_detected = True
+                    post_status_start = time.time()
+
+                # Wait a bit for Claude to finish its output after writing status
+                if post_status_start and time.time() - post_status_start > max_post_status_wait:
+                    self._stop_interaction = True
+                    if self.process and self.process.isalive():
+                        try:
+                            self.process.sendline("/exit")
+                        except OSError:
+                            pass
+                    break
+            time.sleep(1)
+
+    def _output_filter(self, data: bytes) -> bytes:
+        """Filter to capture output while passing it through."""
+        try:
+            text = data.decode('utf-8', errors='ignore')
+            self._captured_output.write(text)
+        except Exception:
+            pass
+        return data
 
     def run(self, prompt: str) -> tuple[bool, str, ParsedOutput]:
         """
         Run Claude with the given prompt.
-        Simply spawns the process and lets it output to terminal.
+        Uses pexpect.interact() for bidirectional I/O, allowing Claude
+        to ask questions and receive user input.
         """
         self._interrupted = False
+        self._stop_interaction = False
+        self._captured_output = io.StringIO()
         status_file = Path(self.working_dir) / ".ralph" / "status.json"
 
         # Clear status file before run
@@ -60,65 +100,82 @@ class ClaudeRunner:
         args.append(prompt)
 
         try:
-            # Spawn claude - output goes directly to terminal
+            # Check if we're in a real terminal (not piped/redirected)
+            is_interactive = os.isatty(sys.stdin.fileno())
+
+            # Spawn claude
             self.process = pexpect.spawn(
                 "claude",
                 args,
                 cwd=self.working_dir,
-                timeout=self.idle_timeout,
+                timeout=None if is_interactive else self.idle_timeout,
+                encoding=None,  # Use bytes for interact()
             )
 
-            # Let it output directly to stdout
-            self.process.logfile_read = sys.stdout.buffer
+            # Start background thread to monitor status file
+            monitor_thread = threading.Thread(
+                target=self._monitor_status_file,
+                args=(status_file,),
+                daemon=True
+            )
+            monitor_thread.start()
 
-            # Keep waiting while there's output
-            # After status file detected, use shorter timeout and max wait
-            import time
-            status_detected = False
-            post_status_start = None
-            post_status_idle_timeout = 3  # Short idle timeout after status
-            max_post_status_wait = 10  # Max total wait after status (fallback)
-
-            while True:
+            if is_interactive:
+                # Interactive mode: use interact() for bidirectional I/O
+                # This allows Claude to ask questions and user to respond
                 try:
-                    # Use shorter timeout after status is detected
-                    timeout = post_status_idle_timeout if status_detected else self.idle_timeout
-                    self.process.expect(r'.+', timeout=timeout)
+                    self.process.interact(output_filter=self._output_filter)
+                except OSError:
+                    # Process may have terminated
+                    pass
+            else:
+                # Non-interactive mode: fall back to expect loop
+                self.process.logfile_read = sys.stdout.buffer
 
-                    # Check if Claude wrote the status file FOR THIS TASK
-                    # Validates task_id to prevent cross-process interference
-                    if status_file.exists() and not status_detected:
-                        if self._is_our_status_file(status_file):
-                            status_detected = True
-                            post_status_start = time.time()
+                status_detected = False
+                post_status_start = None
+                post_status_idle_timeout = 3
+                max_post_status_wait = 10
 
-                    # Check max wait after status (fallback)
-                    if status_detected and post_status_start:
-                        if time.time() - post_status_start > max_post_status_wait:
-                            break
+                while True:
+                    try:
+                        timeout = post_status_idle_timeout if status_detected else self.idle_timeout
+                        self.process.expect(r'.+', timeout=timeout)
 
-                except pexpect.TIMEOUT:
-                    # No output for timeout period - Claude is idle/done
-                    break
-                except pexpect.EOF:
-                    # Process ended
-                    break
+                        if status_file.exists() and not status_detected:
+                            if self._is_our_status_file(status_file):
+                                status_detected = True
+                                post_status_start = time.time()
 
-            if self.process.isalive():
+                        if status_detected and post_status_start:
+                            if time.time() - post_status_start > max_post_status_wait:
+                                break
+
+                    except pexpect.TIMEOUT:
+                        break
+                    except pexpect.EOF:
+                        break
+
+            # Signal monitor thread to stop
+            self._stop_interaction = True
+            monitor_thread.join(timeout=2)
+
+            # Clean up process
+            if self.process and self.process.isalive():
                 self.process.sendline("/exit")
                 try:
                     self.process.expect(pexpect.EOF, timeout=10)
-                except pexpect.TIMEOUT:
+                except (pexpect.TIMEOUT, pexpect.EOF):
                     self.process.terminate(force=True)
 
             # Get output for parsing
-            output = ""
-            if self.process.before:
+            output = self._captured_output.getvalue()
+            if not output and self.process and self.process.before:
                 before = self.process.before
                 if isinstance(before, bytes):
                     output = before.decode('utf-8', errors='ignore')
                 else:
-                    output = before
+                    output = str(before)
 
             # Read status from file (Claude writes here when done)
             parsed = self._read_status_file(status_file, output)
@@ -128,6 +185,7 @@ class ClaudeRunner:
             return (False, str(e), ParsedOutput(errors=[str(e)]))
 
         finally:
+            self._stop_interaction = True
             if self.process:
                 try:
                     if self.process.isalive():

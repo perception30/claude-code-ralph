@@ -2,7 +2,10 @@
 
 import io
 import json
+import os
 import sys
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -45,6 +48,8 @@ class GeneratorExecutor:
     def __init__(self, config: Optional[GenerationExecutionConfig] = None):
         self.config = config or GenerationExecutionConfig()
         self.process: Optional[pexpect.spawn] = None
+        self._stop_interaction = False
+        self._captured_output = io.StringIO()
 
     def _is_our_status_file(self, status_file: Path) -> bool:
         """Check if status file belongs to this process.
@@ -70,8 +75,36 @@ class GeneratorExecutor:
             # File might be partially written, ignore for now
             return False
 
+    def _monitor_status_file(self, status_file: Path) -> None:
+        """Background thread to monitor status file and signal completion."""
+        while not self._stop_interaction:
+            if status_file.exists() and self._is_our_status_file(status_file):
+                self._stop_interaction = True
+                # Send EOF to terminate interact() - this is the cleanest way
+                if self.process and self.process.isalive():
+                    # Send /exit command to Claude
+                    try:
+                        self.process.sendline("/exit")
+                    except OSError:
+                        pass
+                break
+            time.sleep(1)
+
+    def _output_filter(self, data: bytes) -> bytes:
+        """Filter to capture output while passing it through."""
+        try:
+            text = data.decode('utf-8', errors='ignore')
+            self._captured_output.write(text)
+        except Exception:
+            pass
+        return data
+
     def execute(self, prompt: str) -> tuple[bool, str]:
-        """Execute Claude with the generation prompt."""
+        """Execute Claude with the generation prompt.
+
+        Uses pexpect.interact() to allow bidirectional I/O, enabling
+        Claude to ask questions and receive user input.
+        """
         args = []
 
         if self.config.skip_permissions:
@@ -89,47 +122,76 @@ class GeneratorExecutor:
         if status_file.exists():
             status_file.unlink()
 
-        tee = TeeWriter()
+        self._stop_interaction = False
+        self._captured_output = io.StringIO()
 
         try:
+            # Check if we're in a real terminal (not piped/redirected)
+            is_interactive = os.isatty(sys.stdin.fileno())
+
             self.process = pexpect.spawn(
                 "claude",
                 args,
                 cwd=self.config.working_dir,
-                timeout=self.config.idle_timeout,
-                encoding='utf-8',
+                timeout=None,  # No timeout - we use interact() mode
+                encoding=None,  # Use bytes for interact()
                 codec_errors='ignore',
             )
 
-            self.process.logfile_read = tee
+            # Start background thread to monitor status file
+            monitor_thread = threading.Thread(
+                target=self._monitor_status_file,
+                args=(status_file,),
+                daemon=True
+            )
+            monitor_thread.start()
 
-            while True:
+            if is_interactive:
+                # Interactive mode: use interact() for bidirectional I/O
+                # This allows Claude to ask questions and user to respond
                 try:
-                    self.process.expect(r'.+', timeout=self.config.idle_timeout)
+                    self.process.interact(output_filter=self._output_filter)
+                except OSError:
+                    # Process may have terminated
+                    pass
+            else:
+                # Non-interactive mode: fall back to expect loop
+                tee = TeeWriter()
+                self.process.logfile_read = tee
 
-                    # Check if Claude wrote status file FOR THIS TASK
-                    # Validates task_id to prevent cross-process interference
-                    if status_file.exists() and self._is_our_status_file(status_file):
+                while True:
+                    try:
+                        self.process.expect(r'.+', timeout=self.config.idle_timeout)
+
+                        if status_file.exists() and self._is_our_status_file(status_file):
+                            break
+
+                    except pexpect.TIMEOUT:
+                        break
+                    except pexpect.EOF:
                         break
 
-                except pexpect.TIMEOUT:
-                    break
-                except pexpect.EOF:
-                    break
+                self._captured_output.write(tee.getvalue())
 
-            if self.process.isalive():
+            # Signal monitor thread to stop
+            self._stop_interaction = True
+            monitor_thread.join(timeout=2)
+
+            # Clean up process
+            if self.process and self.process.isalive():
                 self.process.sendline("/exit")
                 try:
                     self.process.expect(pexpect.EOF, timeout=10)
-                except pexpect.TIMEOUT:
+                except (pexpect.TIMEOUT, pexpect.EOF):
                     self.process.terminate(force=True)
 
-            return (True, tee.getvalue())
+            return (True, self._captured_output.getvalue())
 
         except Exception as e:
             return (False, f"Execution failed: {e}")
 
         finally:
+            self._stop_interaction = True
             if self.process:
                 try:
                     if self.process.isalive():
