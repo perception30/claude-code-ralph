@@ -33,4 +33,4 @@ Implement an automated release pipeline that publishes the `ralph-agent` package
 | Phase | Name | Status |
 |-------|------|--------|
 | 1 | PyPI Account & Trusted Publisher Setup | Complete |
-| 2 | GitHub Actions Release Workflow | In Progress |
+| 2 | GitHub Actions Release Workflow | Complete |

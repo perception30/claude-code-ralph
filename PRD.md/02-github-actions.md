@@ -71,7 +71,7 @@ As a maintainer, I want pushes to main to automatically publish a new release to
             uses: pypa/gh-action-pypi-publish@release/v1
     ```
 
-- [ ] TASK-202: Create GitHub Environment for PyPI
+- [x] TASK-202: Create GitHub Environment for PyPI
   - Priority: Medium
   - Dependencies: none
   - Description:
@@ -80,7 +80,7 @@ As a maintainer, I want pushes to main to automatically publish a new release to
     3. Optionally add protection rules (require reviewers, wait timer)
     4. This environment name must match what's configured in PyPI Trusted Publisher
 
-- [ ] TASK-203: Test the Release Pipeline
+- [x] TASK-203: Test the Release Pipeline
   - Priority: High
   - Dependencies: TASK-201, TASK-202, TASK-102
   - Description:
