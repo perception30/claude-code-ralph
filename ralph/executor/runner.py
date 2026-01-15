@@ -61,10 +61,9 @@ class ClaudeRunner:
                     self._stop_interaction = True
                     if self.process and self.process.isalive():
                         try:
-                            # Write directly to PTY - \r is Enter key in raw terminal mode
-                            import os as _os
-                            _os.write(self.process.child_fd, b"/exit\r")
-                        except OSError:
+                            # Send SIGTERM to gracefully terminate Claude CLI
+                            os.kill(self.process.pid, signal.SIGTERM)
+                        except (OSError, ProcessLookupError):
                             pass
                     break
             time.sleep(1)
@@ -164,14 +163,11 @@ class ClaudeRunner:
 
             # Clean up process
             if self.process and self.process.isalive():
-                # Write directly to PTY - \r is Enter key in raw terminal mode
                 try:
-                    os.write(self.process.child_fd, b"/exit\r")
-                except OSError:
-                    pass
-                try:
+                    # Send SIGTERM to gracefully terminate Claude CLI
+                    os.kill(self.process.pid, signal.SIGTERM)
                     self.process.expect(pexpect.EOF, timeout=10)
-                except (pexpect.TIMEOUT, pexpect.EOF):
+                except (pexpect.TIMEOUT, pexpect.EOF, OSError, ProcessLookupError):
                     self.process.terminate(force=True)
 
             # Get output for parsing

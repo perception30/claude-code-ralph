@@ -82,11 +82,11 @@ class GeneratorExecutor:
                 self._stop_interaction = True
                 # Send EOF to terminate interact() - this is the cleanest way
                 if self.process and self.process.isalive():
-                    # Write directly to PTY - \r is Enter key in raw terminal mode
                     try:
-                        import os as _os
-                        _os.write(self.process.child_fd, b"/exit\r")
-                    except OSError:
+                        # Send SIGTERM to gracefully terminate Claude CLI
+                        import signal as _signal
+                        os.kill(self.process.pid, _signal.SIGTERM)
+                    except (OSError, ProcessLookupError):
                         pass
                 break
             time.sleep(1)
@@ -180,14 +180,12 @@ class GeneratorExecutor:
 
             # Clean up process
             if self.process and self.process.isalive():
-                # Write directly to PTY - \r is Enter key in raw terminal mode
                 try:
-                    os.write(self.process.child_fd, b"/exit\r")
-                except OSError:
-                    pass
-                try:
+                    # Send SIGTERM to gracefully terminate Claude CLI
+                    import signal as _signal
+                    os.kill(self.process.pid, _signal.SIGTERM)
                     self.process.expect(pexpect.EOF, timeout=10)
-                except (pexpect.TIMEOUT, pexpect.EOF):
+                except (pexpect.TIMEOUT, pexpect.EOF, OSError, ProcessLookupError):
                     self.process.terminate(force=True)
 
             return (True, self._captured_output.getvalue())
