@@ -1085,18 +1085,37 @@ def generate_prd(
     result = generator.generate(context)
 
     if result.success:
-        ui.console.print("\n[green]Done![/green]")
+        ui.console.print("\n[green]✓ PRD generation complete![/green]")
 
         if result.warnings:
             ui.console.print("\n[yellow]Warnings:[/yellow]")
             for warning in result.warnings:
                 ui.console.print(f"  - {warning}")
 
-        # Show resume hint if using project-specific output
+        # Show next steps
+        ui.console.print("\n[bold]Next Steps:[/bold]")
+
         if project_identity:
-            ui.console.print(f"\n[dim]Resume with:[/dim]")
+            ui.console.print(f"\n[cyan]Option 1:[/cyan] Run directly from PRD (recommended)")
             ui.console.print(f"  ralph run --id {project_identity.project_id[:8]}")
+            ui.console.print(f"  [dim]# Uses PRD as executable plan[/dim]")
+
+            ui.console.print(f"\n[cyan]Option 2:[/cyan] Convert to phased plans first")
+            ui.console.print(f"  ralph generate plans --from-prd {output_path}")
+            ui.console.print(f"  ralph run --id {project_identity.project_id[:8]}")
+            ui.console.print(f"  [dim]# Adds more detailed task breakdown[/dim]")
+
+            ui.console.print(f"\n[cyan]Option 3:[/cyan] Review and edit before running")
+            ui.console.print(f"  [dim]# Edit files in: {output_path}[/dim]")
             ui.console.print(f"  ralph run --prd {output_path}")
+        else:
+            # Custom output path
+            ui.console.print(f"\n[cyan]Run the PRD:[/cyan]")
+            ui.console.print(f"  ralph run --prd {output_path}")
+
+            ui.console.print(f"\n[cyan]Or convert to plans:[/cyan]")
+            ui.console.print(f"  ralph generate plans --from-prd {output_path}")
+            ui.console.print(f"  ralph run --plans ./plans/")
     else:
         ui.print_error("PRD generation failed")
         for error in result.errors:
@@ -1248,13 +1267,31 @@ def generate_plans(
         result = generator.generate(context)
 
     if result.success:
-        ui.console.print("\n[green]Done![/green]")
+        ui.console.print("\n[green]✓ Plans generation complete![/green]")
 
-        # Show resume hint if using project-specific output
+        # Show next steps
+        ui.console.print("\n[bold]Next Steps:[/bold]")
+
         if project_identity:
-            ui.console.print(f"\n[dim]Resume with:[/dim]")
+            ui.console.print(f"\n[cyan]Option 1:[/cyan] Run immediately (recommended)")
             ui.console.print(f"  ralph run --id {project_identity.project_id[:8]}")
+            ui.console.print(f"  [dim]# Start autonomous implementation[/dim]")
+
+            ui.console.print(f"\n[cyan]Option 2:[/cyan] Review and edit before running")
+            ui.console.print(f"  [dim]# Edit files in: {output_path}[/dim]")
             ui.console.print(f"  ralph run --plans {output_path}")
+
+            ui.console.print(f"\n[cyan]Monitor progress:[/cyan]")
+            ui.console.print(f"  ralph status")
+            ui.console.print(f"  ralph tasks")
+        else:
+            # Custom output path
+            ui.console.print(f"\n[cyan]Run the plans:[/cyan]")
+            ui.console.print(f"  ralph run --plans {output_path}")
+
+            ui.console.print(f"\n[cyan]Monitor progress:[/cyan]")
+            ui.console.print(f"  ralph status")
+            ui.console.print(f"  ralph tasks")
     else:
         ui.print_error("Generation failed")
         for error in result.errors:
