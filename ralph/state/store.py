@@ -357,6 +357,82 @@ class StateStore:
 
         return projects
 
+    @classmethod
+    def load_by_project_id(
+        cls,
+        project_id: str,
+        working_dir: str = "."
+    ) -> tuple[Optional['Project'], Optional['ProjectIdentity']]:
+        """Load project by ID (supports partial match).
+
+        Args:
+            project_id: Full or partial project ID
+            working_dir: Working directory
+
+        Returns:
+            (Project, ProjectIdentity) if found, (None, None) if not found or ambiguous
+        """
+        from .identity import InputType, ProjectIdentity
+
+        base_dir = Path(working_dir).resolve() / cls.DEFAULT_STATE_DIR / cls.PROJECTS_SUBDIR
+
+        if not base_dir.exists():
+            return None, None
+
+        # Find matching directories
+        matches = [d for d in base_dir.iterdir()
+                  if d.is_dir() and d.name.startswith(project_id)]
+
+        if len(matches) != 1:
+            return None, None  # Not found or ambiguous
+
+        # Load project
+        project_dir = matches[0]
+        state_file = project_dir / cls.DEFAULT_STATE_FILE
+
+        if not state_file.exists():
+            return None, None
+
+        try:
+            with open(state_file) as f:
+                data = json.load(f)
+
+            project = Project.from_dict(data)
+
+            # Create ProjectIdentity for resume
+            identity = ProjectIdentity(
+                project_id=project_dir.name,
+                input_type=InputType.PROMPT,  # Generic for resume
+                input_source=f"project:{project_dir.name}",
+                display_name=project.name,
+            )
+
+            return project, identity
+
+        except (json.JSONDecodeError, OSError):
+            return None, None
+
+    @classmethod
+    def find_by_name(
+        cls,
+        name: str,
+        working_dir: str = "."
+    ) -> list[dict]:
+        """Find projects matching a name.
+
+        Returns exact matches first, then partial matches.
+        """
+        all_projects = cls.list_projects(working_dir)
+
+        # Exact match (case-insensitive)
+        exact = [p for p in all_projects if p['name'].lower() == name.lower()]
+        if exact:
+            return exact
+
+        # Partial match
+        partial = [p for p in all_projects if name.lower() in p['name'].lower()]
+        return partial
+
     def backup(self, suffix: str = "") -> Path:
         """Create a backup of the current state."""
         if not self.state_file.exists():

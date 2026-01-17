@@ -67,6 +67,14 @@ def run(
         None, "--config", "-c",
         help="JSON configuration file",
     ),
+    project_id: Optional[str] = typer.Option(
+        None, "--id",
+        help="Project ID (full or partial) to resume",
+    ),
+    project_name: Optional[str] = typer.Option(
+        None, "--name",
+        help="Project name to resume",
+    ),
 
     # Execution settings
     max_iterations: int = typer.Option(
@@ -158,6 +166,39 @@ def run(
     # Print banner
     if not quiet:
         ui.print_banner()
+
+    # Validate input - only one source allowed
+    input_count = sum([
+        prompt is not None,
+        prd is not None,
+        plans is not None,
+        files is not None,
+        config is not None,
+        project_id is not None,
+        project_name is not None,
+    ])
+
+    if input_count > 1:
+        ui.print_error("Only one input source allowed")
+        ui.console.print("\nUse one of: --prompt, --prd, --plans, --files, --config, --id, --name")
+        raise typer.Exit(1)
+
+    # Route to ID/name-based execution if specified
+    if project_id:
+        return _run_by_id(
+            project_id, working_dir, max_iterations,
+            idle_timeout, sleep_between, model,
+            no_skip_permissions, no_commit, no_state,
+            yes, quiet, retry
+        )
+
+    if project_name:
+        return _run_by_name(
+            project_name, working_dir, max_iterations,
+            idle_timeout, sleep_between, model,
+            no_skip_permissions, no_commit, no_state,
+            yes, quiet, retry
+        )
 
     # Determine input source, parse, and create project identity
     project = None
@@ -343,6 +384,141 @@ def run(
     except KeyboardInterrupt:
         ui.print_interrupted()
         raise typer.Exit(130)
+
+
+def _run_by_id(
+    project_id: str,
+    working_dir: str,
+    max_iterations: int,
+    idle_timeout: int,
+    sleep_between: int,
+    model: Optional[str],
+    no_skip_permissions: bool,
+    no_commit: bool,
+    no_state: bool,
+    yes: bool,
+    quiet: bool,
+    retry: int,
+) -> None:
+    """Run Ralph by project ID."""
+    working_dir = os.path.abspath(working_dir)
+
+    # Load project by ID
+    project, identity = StateStore.load_by_project_id(project_id, working_dir)
+
+    if not project:
+        # Check if ambiguous (multiple matches)
+        base_dir = Path(working_dir) / ".ralph" / "projects"
+        if base_dir.exists():
+            matches = [d for d in base_dir.iterdir()
+                      if d.is_dir() and d.name.startswith(project_id)]
+
+            if len(matches) > 1:
+                ui.console.print(f"[yellow]Ambiguous ID '{project_id}'[/yellow]\n")
+                ui.console.print("Matching projects:")
+                for m in matches:
+                    ui.console.print(f"  {m.name}")
+                ui.console.print("\nUse more characters to be specific")
+                raise typer.Exit(1)
+
+        ui.console.print(f"[red]Project not found: {project_id}[/red]")
+        ui.console.print("\nRun [cyan]ralph projects[/cyan] to list available projects")
+        raise typer.Exit(1)
+
+    if project.is_complete:
+        ui.console.print("[green]Project already complete![/green]")
+        raise typer.Exit(0)
+
+    # Show resume info
+    if not quiet:
+        ui.print_banner()
+        ui.console.print(f"[bold]Resuming:[/bold] {project.name}")
+        ui.console.print(f"[bold]Project ID:[/bold] {identity.project_id[:8]}...")
+        ui.console.print(f"[bold]Progress:[/bold] {project.completed_tasks}/{project.total_tasks} tasks")
+        ui.console.print()
+
+    # Confirm execution
+    if not yes and not quiet:
+        if not typer.confirm("Continue execution?", default=True):
+            raise typer.Exit(0)
+
+    # Create retry config
+    retry_config = RetryConfig(max_attempts=retry)
+
+    # Create executor
+    executor = RalphExecutor(
+        project=project,
+        working_dir=working_dir,
+        max_iterations=max_iterations,
+        idle_timeout=idle_timeout,
+        sleep_between=sleep_between,
+        model=model,
+        skip_permissions=not no_skip_permissions,
+        commit_prefix="feat:" if not no_commit else "",
+        update_source=not no_state,
+        on_output=lambda line: ui.print_claude_line(line) if not quiet else None,
+        retry_config=retry_config,
+        project_identity=identity,
+    )
+
+    # Run execution
+    try:
+        ui.start_session(max_iterations)
+        success = executor.run()
+
+        if success:
+            tracker_project = executor.tracker.project
+            ui.print_all_complete(
+                tracker_project.current_iteration if tracker_project else 0,
+                tracker_project.total_tasks if tracker_project else 0,
+            )
+        raise typer.Exit(0 if success else 1)
+
+    except KeyboardInterrupt:
+        ui.print_interrupted()
+        raise typer.Exit(130)
+
+
+def _run_by_name(
+    project_name: str,
+    working_dir: str,
+    max_iterations: int,
+    idle_timeout: int,
+    sleep_between: int,
+    model: Optional[str],
+    no_skip_permissions: bool,
+    no_commit: bool,
+    no_state: bool,
+    yes: bool,
+    quiet: bool,
+    retry: int,
+) -> None:
+    """Run Ralph by project name."""
+    working_dir = os.path.abspath(working_dir)
+
+    # Find projects by name
+    matches = StateStore.find_by_name(project_name, working_dir)
+
+    if not matches:
+        ui.console.print(f"[red]No project found with name: {project_name}[/red]")
+        ui.console.print("\nRun [cyan]ralph projects[/cyan] to list available projects")
+        raise typer.Exit(1)
+
+    if len(matches) > 1:
+        ui.console.print(f"[yellow]Multiple projects match '{project_name}':[/yellow]\n")
+        for m in matches:
+            ui.console.print(f"  ID: {m['project_id'][:8]}... Name: {m['name']}")
+        ui.console.print("\nUse [cyan]--id[/cyan] with specific ID")
+        raise typer.Exit(1)
+
+    # Use the matching project ID
+    project_id = matches[0]['project_id']
+    return _run_by_id(
+        project_id, working_dir, max_iterations,
+        idle_timeout, sleep_between, model,
+        no_skip_permissions, no_commit, no_state,
+        yes, quiet, retry
+    )
 
 
 @app.command()
@@ -734,6 +910,7 @@ def projects(
         )
 
     ui.console.print(table)
+    ui.console.print("\n[dim]Resume: ralph run --id <ID> or --name <NAME>[/dim]")
 
 
 # Generate command group

@@ -187,6 +187,8 @@ ralph run [OPTIONS]
 | `--prd` | PRD markdown file or directory |
 | `--files` | Specific plan files |
 | `--config, -c` | JSON config file |
+| `--id` | Resume project by ID (full or partial) |
+| `--name` | Resume project by name |
 
 **Execution Options:**
 
@@ -222,6 +224,28 @@ ralph run --plans ./plans/ --dry-run
 
 # Auto-confirm all prompts
 ralph run --plans ./plans/ --yes
+
+# Resume by project ID (from ralph projects)
+ralph run --id abc123de
+
+# Resume by project name
+ralph run --name "auth service"
+```
+
+**Resume Workflow:**
+
+```bash
+# List all projects with their IDs
+$ ralph projects
+ID       Name      Status       Progress
+abc123.. auth      in_progress  5/10
+def456.. payments  pending      0/8
+
+# Resume by ID (partial match works)
+$ ralph run --id abc123
+
+# Or resume by name
+$ ralph run --name auth
 ```
 
 ---
@@ -501,8 +525,15 @@ Each input source gets isolated state in `.ralph/projects/`.
 If Ralph is interrupted (Ctrl+C, timeout, etc.):
 
 ```bash
-# Just run the same command again
+# Option 1: Run the same command again (re-parses files)
 ralph run --plans ./my-feature/
+
+# Option 2: Resume by ID (uses saved state)
+ralph projects                    # Find your project ID
+ralph run --id abc123de           # Resume from saved state
+
+# Option 3: Resume by name
+ralph run --name "my feature"
 
 # Or use resume
 ralph resume
