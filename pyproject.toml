@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ralph-agent"
-version = "1.0.8"
+version = "1.0.9"
 description = "Ralph - Autonomous Claude Code Agent Runner"
 readme = "README.md"
 license = "MIT"
