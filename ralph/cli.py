@@ -23,7 +23,7 @@ from .input.plans import PlansInput
 from .input.prd import PRDInput
 from .input.prompt import PromptInput
 from .parser.markdown import MarkdownParser
-from .state.identity import ProjectIdentifier, ProjectIdentity
+from .state.identity import InputType, ProjectIdentifier, ProjectIdentity
 from .state.models import TaskStatus
 from .state.store import StateStore
 from .state.tracker import ProgressTracker
@@ -918,6 +918,69 @@ generate_app = typer.Typer(help="Generate PRDs and phased plans")
 app.add_typer(generate_app, name="generate")
 
 
+def _get_generator_output_path(
+    input_source: str,
+    input_type: str,
+    custom_output: Optional[str],
+    working_dir: str,
+) -> tuple[str, Optional[ProjectIdentity]]:
+    """Determine output path for generators.
+
+    Args:
+        input_source: Prompt text, file path, or PRD path
+        input_type: "prd" or "plans"
+        custom_output: User-specified output (or None)
+        working_dir: Working directory
+
+    Returns:
+        (output_path, project_identity)
+    """
+    working_dir = os.path.abspath(working_dir)
+
+    # If user specified output, use it (no ProjectIdentity)
+    if custom_output:
+        return os.path.abspath(custom_output), None
+
+    # Check if input_source is a path in existing project
+    if os.path.exists(input_source):
+        path = Path(input_source).resolve()
+
+        # Check if it's inside .ralph/projects/<id>/
+        try:
+            base_projects = Path(working_dir) / ".ralph" / "projects"
+            rel_path = path.relative_to(base_projects)
+            # Extract project ID (first path component)
+            existing_id = str(rel_path.parts[0])
+
+            # Reuse existing project ID
+            identity = ProjectIdentity(
+                project_id=existing_id,
+                input_type=InputType.PROMPT,
+                input_source=input_source,
+                display_name=input_type,
+            )
+
+            # Return path within same project
+            subdir = "PRDs" if input_type == "prd" else "plans"
+            output_path = str(base_projects / existing_id / subdir)
+
+            return output_path, identity
+
+        except ValueError:
+            # Not inside .ralph/projects/, create new identity
+            pass
+
+    # Create new ProjectIdentity
+    identity = ProjectIdentifier.from_prompt(input_source)
+
+    # Build output path
+    base_dir = Path(working_dir) / ".ralph" / "projects" / identity.project_id
+    subdir = "PRDs" if input_type == "prd" else "plans"
+    output_path = str(base_dir / subdir)
+
+    return output_path, identity
+
+
 @generate_app.command("prd")
 def generate_prd(
     prompt: Optional[str] = typer.Option(
@@ -928,9 +991,9 @@ def generate_prd(
         None, "--from-file", "-f",
         help="Path to prompt file (.txt, .md)",
     ),
-    output: str = typer.Option(
-        "./PRDs", "--output", "-o",
-        help="Output directory path",
+    output: Optional[str] = typer.Option(
+        None, "--output", "-o",
+        help="Output directory (default: .ralph/projects/<id>/PRDs/)",
     ),
     project_name: Optional[str] = typer.Option(
         None, "--name", "-n",
@@ -981,10 +1044,23 @@ def generate_prd(
             ui.print_error(f"File not found: {from_file}")
             raise typer.Exit(1)
 
+    # Determine output path and project identity
+    output_path, project_identity = _get_generator_output_path(
+        input_source=input_prompt,
+        input_type="prd",
+        custom_output=output,
+        working_dir=working_dir,
+    )
+
+    # Show project info if using project-specific output
+    if project_identity:
+        ui.console.print(f"\n[dim]Project ID: {project_identity.project_id[:8]}...[/dim]")
+        ui.console.print(f"[dim]Output: {output_path}[/dim]\n")
+
     # Create context
     context = GeneratorContext(
         prompt=input_prompt,
-        output_path=output,
+        output_path=output_path,
         project_name=project_name,
     )
 
@@ -1015,6 +1091,12 @@ def generate_prd(
             ui.console.print("\n[yellow]Warnings:[/yellow]")
             for warning in result.warnings:
                 ui.console.print(f"  - {warning}")
+
+        # Show resume hint if using project-specific output
+        if project_identity:
+            ui.console.print(f"\n[dim]Resume with:[/dim]")
+            ui.console.print(f"  ralph run --id {project_identity.project_id[:8]}")
+            ui.console.print(f"  ralph run --prd {output_path}")
     else:
         ui.print_error("PRD generation failed")
         for error in result.errors:
@@ -1036,9 +1118,9 @@ def generate_plans(
         None, "--from-prd",
         help="Convert PRD file to plans",
     ),
-    output: str = typer.Option(
-        "./plans", "--output", "-o",
-        help="Output directory path",
+    output: Optional[str] = typer.Option(
+        None, "--output", "-o",
+        help="Output directory (default: .ralph/projects/<id>/plans/)",
     ),
     project_name: Optional[str] = typer.Option(
         None, "--name", "-n",
@@ -1091,6 +1173,26 @@ def generate_plans(
         ui.print_error("Only one input source can be specified")
         raise typer.Exit(1)
 
+    # Determine input source
+    if from_prd:
+        input_source = from_prd
+    else:
+        input_source = prompt if prompt else from_file
+    assert input_source is not None  # Validated above
+
+    # Determine output path and project identity
+    output_path, project_identity = _get_generator_output_path(
+        input_source=input_source,
+        input_type="plans",
+        custom_output=output,
+        working_dir=working_dir,
+    )
+
+    # Show project info if using project-specific output
+    if project_identity:
+        ui.console.print(f"\n[dim]Project ID: {project_identity.project_id[:8]}...[/dim]")
+        ui.console.print(f"[dim]Output: {output_path}[/dim]\n")
+
     # Create generator
     generator = PlansGenerator(
         model=model,
@@ -1111,7 +1213,7 @@ def generate_plans(
 
         result = generator.generate_from_prd(
             prd_path=str(prd_path),
-            output_path=output,
+            output_path=output_path,
             num_phases=phases,
         )
     else:
@@ -1128,7 +1230,7 @@ def generate_plans(
         # Create context
         context = GeneratorContext(
             prompt=input_prompt,
-            output_path=output,
+            output_path=output_path,
             project_name=project_name,
             num_phases=phases,
             max_tasks_per_phase=max_tasks,
@@ -1147,6 +1249,12 @@ def generate_plans(
 
     if result.success:
         ui.console.print("\n[green]Done![/green]")
+
+        # Show resume hint if using project-specific output
+        if project_identity:
+            ui.console.print(f"\n[dim]Resume with:[/dim]")
+            ui.console.print(f"  ralph run --id {project_identity.project_id[:8]}")
+            ui.console.print(f"  ralph run --plans {output_path}")
     else:
         ui.print_error("Generation failed")
         for error in result.errors:

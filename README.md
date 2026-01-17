@@ -127,16 +127,22 @@ Let Claude help you plan before executing:
 ```bash
 # Step 1: Generate a PRD from your idea
 ralph generate prd --prompt "Build a REST API for task management with teams"
+# Output: .ralph/projects/<id>/PRDs/
+# Project ID: abc123def456...
 
-# Step 2: Review PRDs/, edit if needed
+# Step 2: Review generated PRDs (optional)
 
-# Step 3: Run directly on PRD directory
-ralph run --prd ./PRDs/
+# Step 3: Run directly by ID (recommended)
+ralph run --id abc123
 
 # OR: Convert PRD to executable plans first
-ralph generate plans --from-prd ./PRDs/
-ralph run --plans ./plans/
+ralph generate plans --from-prd .ralph/projects/abc123.../PRDs/
+# Reuses same project ID, outputs to: .ralph/projects/abc123.../plans/
+
+ralph run --id abc123
 ```
+
+**Note:** Generated files are automatically organized in `.ralph/projects/<id>/` for easy resumption. You can specify `--output` for custom locations.
 
 ---
 
