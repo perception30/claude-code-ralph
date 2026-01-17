@@ -13,6 +13,7 @@ class ExecutionContext:
     iteration: int
     working_dir: str
     source_files: list[str]
+    progress_file: str = ".ralph/progress.txt"
     custom_instructions: str = ""
     commit_prefix: str = "feat:"
     update_source: bool = True
@@ -29,6 +30,9 @@ class PromptBuilder:
 ## PROJECT STATUS
 {progress_summary}
 
+## PREVIOUS PROGRESS
+Previous iterations logged in `{progress_file}`. Read if you need context about past decisions/learnings.
+
 ## CURRENT TASK
 {current_task}
 
@@ -43,7 +47,19 @@ class PromptBuilder:
 5. **Commit** - If checks pass: `git commit -m "{commit_prefix} {task_id} - {task_name}"`
 
 ## COMPLETION
-When done, write status to `.ralph/status.json`:
+When done, document progress BEFORE writing status:
+
+**Step 1: Append to `{progress_file}`** (compact, 5-10 lines total):
+```markdown
+---
+# Iteration {iteration} - {task_id}: {task_name}
+## Done: [key actions, 2-3 bullets]
+## Decisions: [critical choices with brief why, 1-2 bullets]
+## Learnings: [important discoveries, 1-2 bullets]
+## Challenges: [major blockers + solutions, 1-2 bullets or omit]
+```
+
+**Step 2: Write status to `.ralph/status.json`**:
 ```json
 {{"status": "COMPLETED", "task_id": "{task_id}"}}
 ```
@@ -93,6 +109,7 @@ Now implement the task carefully. Be thorough but efficient.'''
         return self.AUTONOMOUS_PROMPT_TEMPLATE.format(
             iteration=ctx.iteration,
             progress_summary=progress_summary,
+            progress_file=ctx.progress_file,
             current_task=current_task,
             source_files=source_files,
             commit_prefix=ctx.commit_prefix,

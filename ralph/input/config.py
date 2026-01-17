@@ -190,7 +190,7 @@ class ConfigInput(InputSource):
                     result.errors.extend(plans_result.errors)
 
             elif self.config.input_type == "prd":
-                prd_input = PRDInput(prd_file=str(input_path))
+                prd_input = PRDInput(prd_path=str(input_path))
                 prd_result = prd_input.parse()
 
                 if prd_result.is_valid:

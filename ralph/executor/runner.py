@@ -378,6 +378,7 @@ class RalphExecutor:
                 iteration=iteration,
                 working_dir=self.working_dir,
                 source_files=self.project.source_files,
+                progress_file=str(self.store.state_dir / "progress.txt"),
                 custom_instructions=self.custom_instructions,
                 commit_prefix=self.commit_prefix,
                 update_source=self.update_source,

@@ -130,10 +130,11 @@ ralph generate prd --prompt "Build a REST API for task management with teams"
 
 # Step 2: Review PRDs/, edit if needed
 
-# Step 3: Convert PRD to executable plans (or run directly on PRDs)
-ralph generate plans --from-prd ./PRDs/
+# Step 3: Run directly on PRD directory
+ralph run --prd ./PRDs/
 
-# Step 4: Execute the plans
+# OR: Convert PRD to executable plans first
+ralph generate plans --from-prd ./PRDs/
 ralph run --plans ./plans/
 ```
 
@@ -183,7 +184,7 @@ ralph run [OPTIONS]
 |--------|-------------|
 | `--prompt, -p` | Direct task description |
 | `--plans` | Directory of plan files |
-| `--prd` | PRD markdown file |
+| `--prd` | PRD markdown file or directory |
 | `--files` | Specific plan files |
 | `--config, -c` | JSON config file |
 
@@ -203,6 +204,12 @@ ralph run [OPTIONS]
 ```bash
 # Simple prompt
 ralph run -p "Add logout button"
+
+# From PRD file (single file)
+ralph run --prd ./docs/PRD.md
+
+# From PRD directory (generated format)
+ralph run --prd ./PRDs/
 
 # From plans directory
 ralph run --plans ./my-feature/

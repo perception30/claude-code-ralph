@@ -53,7 +53,7 @@ def run(
     ),
     prd: Optional[str] = typer.Option(
         None, "--prd",
-        help="PRD markdown file to parse",
+        help="PRD markdown file or directory to parse",
     ),
     plans: Optional[str] = typer.Option(
         None, "--plans",
@@ -179,8 +179,8 @@ def run(
             raise typer.Exit(1)
 
     elif prd:
-        # PRD file
-        input_source = PRDInput(prd_file=prd)
+        # PRD file or directory
+        input_source = PRDInput(prd_path=prd)
         errors = input_source.validate()
         if errors:
             for err in errors:
